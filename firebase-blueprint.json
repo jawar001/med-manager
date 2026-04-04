@@ -1,0 +1,137 @@
+{
+  "entities": {
+    "Patient": {
+      "title": "Patient",
+      "description": "A patient record in the dental management system.",
+      "type": "object",
+      "properties": {
+        "serialNo": { "type": "string", "description": "Unique serial number for the patient." },
+        "name": { "type": "string", "description": "Full name of the patient." },
+        "email": { "type": "string", "format": "email", "description": "Email address of the patient." },
+        "serviceType": { "type": "string", "description": "Type of dental service provided." },
+        "amountDue": { "type": "number", "description": "Total amount due for the service." },
+        "amountPaid": { "type": "number", "description": "Total amount paid by the patient." },
+        "paymentType": { "type": "string", "enum": ["Direct", "Installments"], "description": "Method of payment." },
+        "status": { "type": "string", "enum": ["Paid", "Unpaid"], "description": "Payment status." },
+        "medicalHistory": { "type": "array", "items": { "type": "string" }, "description": "List of medical history items." },
+        "allergies": { "type": "string", "description": "Patient allergies." },
+        "chronicConditions": { "type": "string", "description": "Chronic conditions the patient has." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp when the record was created." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Timestamp when the record was last updated." }
+      },
+      "required": ["serialNo", "name", "email", "serviceType", "amountDue", "amountPaid", "paymentType", "status", "createdAt", "updatedAt"]
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "A scheduled appointment for a patient.",
+      "type": "object",
+      "properties": {
+        "patientId": { "type": "string", "description": "Reference to the patient ID." },
+        "patientName": { "type": "string", "description": "Name of the patient." },
+        "date": { "type": "string", "format": "date", "description": "Date of the appointment." },
+        "time": { "type": "string", "description": "Time of the appointment." },
+        "serviceType": { "type": "string", "description": "Type of dental service for the appointment." },
+        "status": { "type": "string", "enum": ["Scheduled", "Completed", "Cancelled"], "description": "Appointment status." }
+      },
+      "required": ["patientId", "patientName", "date", "time", "serviceType", "status"]
+    },
+    "InventoryItem": {
+      "title": "InventoryItem",
+      "description": "An item in the clinic inventory.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the item." },
+        "category": { "type": "string", "description": "Category of the item." },
+        "medicineType": { "type": "string", "description": "Type of medicine (if applicable)." },
+        "quantity": { "type": "number", "description": "Current quantity in stock." },
+        "unit": { "type": "string", "description": "Unit of measurement." },
+        "minThreshold": { "type": "number", "description": "Minimum quantity before restocking is needed." },
+        "lastRestocked": { "type": "string", "format": "date", "description": "Date when the item was last restocked." }
+      },
+      "required": ["name", "category", "quantity", "unit", "minThreshold", "lastRestocked"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "A financial transaction record.",
+      "type": "object",
+      "properties": {
+        "patientId": { "type": "string", "description": "Reference to the patient ID (if applicable)." },
+        "patientName": { "type": "string", "description": "Name of the patient (if applicable)." },
+        "amount": { "type": "number", "description": "Transaction amount." },
+        "type": { "type": "string", "enum": ["Income", "Expense"], "description": "Type of transaction." },
+        "category": { "type": "string", "description": "Category of the transaction." },
+        "date": { "type": "string", "format": "date", "description": "Date of the transaction." },
+        "description": { "type": "string", "description": "Brief description of the transaction." }
+      },
+      "required": ["amount", "type", "category", "date", "description"]
+    },
+    "Doctor": {
+      "title": "Doctor",
+      "description": "A doctor profile in the dental management system.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID." },
+        "specialization": { "type": "string", "description": "Doctor's specialization." },
+        "licenseNo": { "type": "string", "description": "Medical license number." },
+        "clinicName": { "type": "string", "description": "Name of the clinic." },
+        "phone": { "type": "string", "description": "Contact phone number." },
+        "bio": { "type": "string", "description": "Brief professional biography." },
+        "address": { "type": "string", "description": "Clinic address." },
+        "photoURL": { "type": "string", "description": "Base64 encoded profile picture." }
+      },
+      "required": ["uid", "specialization", "licenseNo", "clinicName"]
+    },
+    "Prescription": {
+      "title": "Prescription",
+      "description": "A medical prescription for a patient.",
+      "type": "object",
+      "properties": {
+        "patientId": { "type": "string", "description": "Reference to the patient ID." },
+        "patientName": { "type": "string", "description": "Name of the patient." },
+        "patientEmail": { "type": "string", "description": "Email of the patient." },
+        "doctorName": { "type": "string", "description": "Name of the prescribing doctor." },
+        "date": { "type": "string", "format": "date-time", "description": "Date of the prescription." },
+        "medicines": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "dosage": { "type": "string" },
+              "frequency": { "type": "string" },
+              "duration": { "type": "string" }
+            }
+          }
+        },
+        "instructions": { "type": "string", "description": "Additional instructions." }
+      },
+      "required": ["patientId", "patientName", "patientEmail", "doctorName", "date", "medicines"]
+    }
+  },
+  "firestore": {
+    "/patients": {
+      "schema": "Patient",
+      "description": "Collection of patient records."
+    },
+    "/appointments": {
+      "schema": "Appointment",
+      "description": "Collection of patient appointments."
+    },
+    "/inventory": {
+      "schema": "InventoryItem",
+      "description": "Collection of inventory items."
+    },
+    "/transactions": {
+      "schema": "Transaction",
+      "description": "Collection of financial transactions."
+    },
+    "/doctors": {
+      "schema": "Doctor",
+      "description": "Collection of doctor profiles."
+    },
+    "/prescriptions": {
+      "schema": "Prescription",
+      "description": "Collection of medical prescriptions."
+    }
+  }
+}

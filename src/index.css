@@ -1,0 +1,65 @@
+@import "tailwindcss";
+
+@theme {
+  --color-glass-bg: rgba(255, 255, 255, 0.03);
+  --color-glass-border: rgba(255, 255, 255, 0.08);
+  --color-dark-bg: #020617;
+  --color-dark-card: rgba(15, 23, 42, 0.4);
+  --color-accent-teal: #00f2ff;
+  --color-accent-purple: #8b5cf6;
+  --color-accent-green: #10b981;
+  --color-accent-orange: #f59e0b;
+  --color-accent-blue: #3b82f6;
+  --color-accent-red: #ef4444;
+}
+
+@layer utilities {
+  .glass {
+    @apply backdrop-blur-xl bg-glass-bg border border-glass-border;
+  }
+  
+  .glass-card {
+    @apply backdrop-blur-2xl bg-dark-card border border-glass-border shadow-2xl relative overflow-hidden;
+  }
+
+  .glass-card-glow::after {
+    content: '';
+    @apply absolute bottom-0 left-0 w-full h-[2px] opacity-50;
+    background: linear-gradient(90deg, transparent 0%, currentColor 50%, transparent 100%);
+  }
+
+  .glow-teal {
+    box-shadow: 0 10px 30px -10px rgba(0, 242, 255, 0.4);
+    @apply text-accent-teal;
+  }
+  
+  .glow-purple {
+    box-shadow: 0 10px 30px -10px rgba(139, 92, 246, 0.4);
+    @apply text-accent-purple;
+  }
+  
+  .glow-green {
+    box-shadow: 0 10px 30px -10px rgba(16, 185, 129, 0.4);
+    @apply text-accent-green;
+  }
+  
+  .glow-orange {
+    box-shadow: 0 10px 30px -10px rgba(245, 158, 11, 0.4);
+    @apply text-accent-orange;
+  }
+
+  .glow-blue {
+    box-shadow: 0 10px 30px -10px rgba(59, 130, 246, 0.4);
+    @apply text-accent-blue;
+  }
+
+  .glow-red {
+    box-shadow: 0 10px 30px -10px rgba(239, 68, 68, 0.4);
+    @apply text-accent-red;
+  }
+
+  .sidebar-active-glow {
+    background: linear-gradient(90deg, rgba(0, 242, 255, 0.15) 0%, transparent 100%);
+    @apply border-l-2 border-accent-teal;
+  }
+}
