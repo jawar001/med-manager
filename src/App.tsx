@@ -556,6 +556,7 @@ function AppContent() {
           <SidebarItem icon={BarChart3} label={isSidebarOpen ? "Dashboard" : ""} active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} darkMode={darkMode} />
           <SidebarItem icon={Calendar} label={isSidebarOpen ? "Appointments" : ""} active={activeTab === 'appointments'} onClick={() => setActiveTab('appointments')} darkMode={darkMode} />
           <SidebarItem icon={Users} label={isSidebarOpen ? "Analytics" : ""} active={activeTab === 'analytics'} onClick={() => setActiveTab('analytics')} darkMode={darkMode} />
+          <SidebarItem icon={ClipboardList} label={isSidebarOpen ? "Prescriptions" : ""} active={activeTab === 'prescriptions'} onClick={() => setActiveTab('prescriptions')} darkMode={darkMode} />
           <SidebarItem icon={Package} label={isSidebarOpen ? "Inventory" : ""} active={activeTab === 'inventory'} onClick={() => setActiveTab('inventory')} darkMode={darkMode} />
           <SidebarItem icon={FileText} label={isSidebarOpen ? "Sheets" : ""} active={activeTab === 'sheets'} onClick={() => setActiveTab('sheets')} darkMode={darkMode} />
           <SidebarItem icon={UserCircle} label={isSidebarOpen ? "Profile" : ""} active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} darkMode={darkMode} />
@@ -798,6 +799,7 @@ function AppContent() {
           {activeTab === 'analytics' && <AnalyticsView transactions={transactions} patients={patients} darkMode={darkMode} />}
           {activeTab === 'inventory' && <InventoryView inventory={inventory} darkMode={darkMode} />}
           {activeTab === 'appointments' && <AppointmentsView appointments={appointments} patients={patients} darkMode={darkMode} />}
+          {activeTab === 'prescriptions' && <PrescriptionsView patients={patients} prescriptions={prescriptions} doctorProfile={doctorProfile} user={user} darkMode={darkMode} />}
           {activeTab === 'sheets' && <SheetsView transactions={transactions} darkMode={darkMode} />}
           {activeTab === 'profile' && <ProfileView user={user} darkMode={darkMode} />}
         </div>
