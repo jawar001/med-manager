@@ -6,3 +6,16 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Firebase Admin SDK keys (sensitive)
+*-firebase-adminsdk-*.json
+
+# Cloudflare
+.wrangler/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
