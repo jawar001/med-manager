@@ -204,7 +204,7 @@ const LoginSignup = ({ darkMode }: { darkMode: boolean }) => {
       darkMode ? "bg-[#0f172a]" : "bg-[#f8fafc]"
     )}>
       <div className={cn(
-        "w-full max-w-md p-8 rounded-[2.5rem] shadow-2xl border transition-all duration-500",
+        "w-full max-w-md p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] shadow-2xl border transition-all duration-500",
         darkMode ? "bg-slate-900/50 border-slate-800 backdrop-blur-xl" : "bg-white/80 border-slate-100 backdrop-blur-xl"
       )}>
         <div className="text-center mb-8">
@@ -351,9 +351,9 @@ const SidebarItem = ({ icon: Icon, label, active, onClick, darkMode }: { icon: a
 
 const StatCard = ({ label, value, icon: Icon, color, darkMode, glowClass }: { label: string, value: string | number, icon: any, color: string, darkMode: boolean, glowClass?: string }) => (
   <div className={cn(
-    "p-6 rounded-3xl border transition-all duration-500 group relative overflow-hidden",
-    darkMode 
-      ? "glass-card glass-card-glow hover:scale-[1.02] " + glowClass 
+    "p-4 md:p-6 rounded-2xl md:rounded-3xl border transition-all duration-500 group relative overflow-hidden",
+    darkMode
+      ? "glass-card glass-card-glow hover:scale-[1.02] " + glowClass
       : "bg-white border-slate-100 shadow-sm hover:shadow-md"
   )}>
     {darkMode && (
@@ -366,12 +366,12 @@ const StatCard = ({ label, value, icon: Icon, color, darkMode, glowClass }: { la
       )}></div>
     )}
     <div className="flex items-start justify-between relative z-10">
-      <div>
-        <p className={cn("text-xs font-bold uppercase tracking-widest mb-2 opacity-60", darkMode ? "text-slate-300" : "text-slate-500")}>{label}</p>
-        <h3 className={cn("text-3xl font-black tracking-tight", darkMode ? "text-white" : "text-slate-900")}>{value}</h3>
+      <div className="min-w-0 flex-1">
+        <p className={cn("text-[10px] md:text-xs font-bold uppercase tracking-widest mb-1 md:mb-2 opacity-60 truncate", darkMode ? "text-slate-300" : "text-slate-500")}>{label}</p>
+        <h3 className={cn("text-xl md:text-3xl font-black tracking-tight truncate", darkMode ? "text-white" : "text-slate-900")}>{value}</h3>
       </div>
       <div className={cn(
-        "p-3.5 rounded-2xl shadow-inner transition-transform duration-500 group-hover:rotate-12",
+        "p-2.5 md:p-3.5 rounded-xl md:rounded-2xl shadow-inner transition-transform duration-500 group-hover:rotate-12 flex-shrink-0 ml-2",
         darkMode ? "bg-white/5 border border-white/10" : color
       )}>
         <Icon size={24} className={cn(darkMode ? (
@@ -422,7 +422,12 @@ function AppContent() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [prescriptions, setPrescriptions] = useState<any[]>([]);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= 1024;
+    }
+    return true;
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
@@ -540,31 +545,51 @@ function AppContent() {
       "h-screen flex overflow-hidden transition-colors duration-300",
       darkMode ? "bg-dark-bg text-slate-100" : "bg-slate-50 text-slate-900"
     )}>
+      {/* Mobile Sidebar Backdrop */}
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
       <aside className={cn(
-        "transition-all duration-300 flex flex-col border-r",
-        isSidebarOpen ? "w-64" : "w-20",
-        darkMode ? "bg-dark-bg/80 backdrop-blur-xl border-white/10" : "bg-white border-slate-100"
+        "transition-all duration-300 flex flex-col border-r z-50",
+        "fixed lg:static inset-y-0 left-0",
+        isSidebarOpen ? "w-64 translate-x-0" : "w-0 -translate-x-full lg:w-20 lg:translate-x-0",
+        darkMode ? "bg-dark-bg/95 lg:bg-dark-bg/80 backdrop-blur-xl border-white/10" : "bg-white border-slate-100"
       )}>
-        <div className="p-6 flex items-center gap-3">
+        <div className={cn("p-6 flex items-center gap-3", !isSidebarOpen && "lg:justify-center")}>
           <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-md shadow-blue-100">
             <Users size={20} className="text-white" />
           </div>
-          {isSidebarOpen && <span className={cn("font-bold text-xl tracking-tight", darkMode ? "text-white" : "text-slate-900")}>KHAN DENTAL</span>}
+          {isSidebarOpen && <span className={cn("font-bold text-xl tracking-tight whitespace-nowrap", darkMode ? "text-white" : "text-slate-900")}>KHAN DENTAL</span>}
         </div>
 
-        <nav className="flex-1 px-4 space-y-2 mt-4">
-          <SidebarItem icon={BarChart3} label={isSidebarOpen ? "Dashboard" : ""} active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} darkMode={darkMode} />
-          <SidebarItem icon={Calendar} label={isSidebarOpen ? "Appointments" : ""} active={activeTab === 'appointments'} onClick={() => setActiveTab('appointments')} darkMode={darkMode} />
-          <SidebarItem icon={Users} label={isSidebarOpen ? "Analytics" : ""} active={activeTab === 'analytics'} onClick={() => setActiveTab('analytics')} darkMode={darkMode} />
-          <SidebarItem icon={ClipboardList} label={isSidebarOpen ? "Prescriptions" : ""} active={activeTab === 'prescriptions'} onClick={() => setActiveTab('prescriptions')} darkMode={darkMode} />
-          <SidebarItem icon={Package} label={isSidebarOpen ? "Inventory" : ""} active={activeTab === 'inventory'} onClick={() => setActiveTab('inventory')} darkMode={darkMode} />
-          <SidebarItem icon={FileText} label={isSidebarOpen ? "Sheets" : ""} active={activeTab === 'sheets'} onClick={() => setActiveTab('sheets')} darkMode={darkMode} />
-          <SidebarItem icon={UserCircle} label={isSidebarOpen ? "Profile" : ""} active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} darkMode={darkMode} />
+        <nav className="flex-1 px-4 space-y-2 mt-4 overflow-hidden">
+          {[
+            { icon: BarChart3, tab: 'dashboard' as const, label: 'Dashboard' },
+            { icon: Calendar, tab: 'appointments' as const, label: 'Appointments' },
+            { icon: Users, tab: 'analytics' as const, label: 'Analytics' },
+            { icon: ClipboardList, tab: 'prescriptions' as const, label: 'Prescriptions' },
+            { icon: Package, tab: 'inventory' as const, label: 'Inventory' },
+            { icon: FileText, tab: 'sheets' as const, label: 'Sheets' },
+            { icon: UserCircle, tab: 'profile' as const, label: 'Profile' },
+          ].map(({ icon, tab, label }) => (
+            <SidebarItem
+              key={tab}
+              icon={icon}
+              label={isSidebarOpen ? label : ""}
+              active={activeTab === tab}
+              onClick={() => { setActiveTab(tab); if (window.innerWidth < 1024) setIsSidebarOpen(false); }}
+              darkMode={darkMode}
+            />
+          ))}
         </nav>
 
         <div className={cn("p-4 border-t", darkMode ? "border-white/10" : "border-slate-100")}>
-          <button 
+          <button
             onClick={handleLogout}
             className={cn(
               "flex items-center gap-3 w-full px-4 py-3 rounded-lg transition-all",
@@ -572,7 +597,7 @@ function AppContent() {
             )}
           >
             <LogOut size={20} />
-            {isSidebarOpen && <span className="font-medium">Logout</span>}
+            {isSidebarOpen && <span className="font-medium whitespace-nowrap">Logout</span>}
           </button>
         </div>
       </aside>
@@ -593,20 +618,20 @@ function AppContent() {
         
         {/* Header */}
         <header className={cn(
-          "h-20 border-b px-8 flex items-center justify-between flex-shrink-0 transition-colors z-10",
+          "h-16 md:h-20 border-b px-4 md:px-8 flex items-center justify-between flex-shrink-0 transition-colors z-10",
           darkMode ? "bg-dark-bg/40 backdrop-blur-md border-white/10" : "bg-white border-slate-100"
         )}>
-          <div className="flex items-center gap-4 flex-1">
-            <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className={cn("p-2 rounded-lg transition-colors", darkMode ? "hover:bg-white/10 text-slate-400" : "hover:bg-slate-100 text-slate-500")}>
+          <div className="flex items-center gap-2 md:gap-4 flex-1 min-w-0">
+            <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className={cn("p-2 rounded-lg transition-colors flex-shrink-0", darkMode ? "hover:bg-white/10 text-slate-400" : "hover:bg-slate-100 text-slate-500")}>
               {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
-            <div className="relative max-w-md w-full">
+            <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-              <input 
-                type="text" 
-                placeholder="Search patients, services..."
+              <input
+                type="text"
+                placeholder="Search..."
                 className={cn(
-                  "w-full pl-10 pr-4 py-2 border-none rounded-xl focus:ring-2 focus:ring-blue-100 transition-all",
+                  "w-full pl-10 pr-4 py-2 border-none rounded-xl focus:ring-2 focus:ring-blue-100 transition-all text-sm md:text-base",
                   darkMode ? "bg-white/5 text-white placeholder:text-slate-500 border border-white/10" : "bg-slate-50 text-slate-900"
                 )}
                 value={searchQuery}
@@ -614,25 +639,25 @@ function AppContent() {
               />
             </div>
           </div>
-          <div className="flex items-center gap-6">
-            <button 
+          <div className="flex items-center gap-3 md:gap-6 flex-shrink-0">
+            <button
               onClick={() => setDarkMode(!darkMode)}
               className={cn(
-                "p-2.5 rounded-xl transition-all duration-300",
+                "p-2 md:p-2.5 rounded-xl transition-all duration-300",
                 darkMode ? "bg-white/10 text-amber-400 hover:bg-white/20" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               )}
             >
-              {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+              {darkMode ? <Sun size={18} /> : <Moon size={18} />}
             </button>
-            <div className="flex items-center gap-4">
-              <div className="text-right hidden sm:block">
+            <div className="flex items-center gap-3">
+              <div className="text-right hidden md:block">
                 <p className={cn("text-sm font-bold", darkMode ? "text-white" : "text-slate-900")}>{doctorProfile?.displayName || user.displayName || 'Doctor'}</p>
                 <p className="text-xs text-slate-500">{user.email}</p>
               </div>
-              <img 
-                src={doctorProfile?.photoURL || user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName || user.email}&background=2563eb&color=fff`} 
-                alt="Profile" 
-                className="w-10 h-10 rounded-xl border-2 border-white shadow-sm object-cover" 
+              <img
+                src={doctorProfile?.photoURL || user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName || user.email}&background=2563eb&color=fff`}
+                alt="Profile"
+                className="w-9 h-9 md:w-10 md:h-10 rounded-xl border-2 border-white shadow-sm object-cover"
                 referrerPolicy="no-referrer"
               />
             </div>
@@ -640,24 +665,25 @@ function AppContent() {
         </header>
 
         {/* View Content */}
-        <div className="flex-1 overflow-y-auto p-8 z-10">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 z-10">
           {activeTab === 'dashboard' && (
             <div className="space-y-8">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <h2 className={cn("text-3xl font-bold", darkMode ? "text-white" : "text-slate-900")}>Welcome Back, {user.displayName ? `Dr. ${user.displayName.split(' ')[0]}` : 'Doctor'} 👋</h2>
-                  <p className="text-slate-500">Manage your patients and payments</p>
+                  <h2 className={cn("text-2xl md:text-3xl font-bold", darkMode ? "text-white" : "text-slate-900")}>Welcome Back, {user.displayName ? `Dr. ${user.displayName.split(' ')[0]}` : 'Doctor'} 👋</h2>
+                  <p className="text-slate-500 text-sm md:text-base">Manage your patients and payments</p>
                 </div>
-                <button 
+                <button
                   onClick={() => { setEditingPatient(null); setShowAddModal(true); }}
-                  className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-700 transition-all flex items-center gap-2 shadow-lg shadow-blue-100"
+                  className="bg-blue-600 text-white px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-bold hover:bg-blue-700 transition-all flex items-center gap-2 shadow-lg shadow-blue-100 text-sm md:text-base self-start sm:self-auto"
                 >
-                  <Plus size={20} />
-                  Add New Patient
+                  <Plus size={18} />
+                  <span className="hidden sm:inline">Add New Patient</span>
+                  <span className="sm:hidden">Add Patient</span>
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
                 <StatCard label="Today's Appointments" value={stats.todayAppointments} icon={Calendar} color="bg-blue-500" darkMode={darkMode} glowClass="glow-blue" />
                 <StatCard label="Total Revenue" value={formatCurrency(stats.totalRevenue)} icon={Banknote} color="bg-teal-500" darkMode={darkMode} glowClass="glow-teal" />
                 <StatCard label="Pending Payments" value={formatCurrency(stats.pendingPayments)} icon={AlertCircle} color="bg-red-500" darkMode={darkMode} glowClass="glow-red" />
@@ -668,55 +694,56 @@ function AppContent() {
                 "rounded-2xl border shadow-sm overflow-hidden transition-all duration-300",
                 darkMode ? "glass-card" : "bg-white border-slate-100"
               )}>
-                <table className="w-full text-left border-collapse">
+                <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse min-w-[700px]">
                   <thead>
                     <tr className={cn("border-b transition-colors", darkMode ? "bg-white/5 border-white/10" : "bg-slate-50 border-slate-100")}>
-                      <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Serial No</th>
-                      <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Patient Name</th>
-                      <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Service Type</th>
-                      <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Payment</th>
-                      <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
-                      <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Actions</th>
+                      <th className="px-4 md:px-6 py-3 md:py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Serial No</th>
+                      <th className="px-4 md:px-6 py-3 md:py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Patient Name</th>
+                      <th className="px-4 md:px-6 py-3 md:py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Service Type</th>
+                      <th className="px-4 md:px-6 py-3 md:py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Payment</th>
+                      <th className="px-4 md:px-6 py-3 md:py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                      <th className="px-4 md:px-6 py-3 md:py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
                   <tbody className={cn("divide-y transition-colors", darkMode ? "divide-white/10" : "divide-slate-100")}>
                     {filteredPatients.map((patient) => (
                       <tr key={patient.id} className={cn("transition-colors", darkMode ? "hover:bg-white/5" : "hover:bg-slate-50")}>
-                        <td className="px-6 py-4 font-mono text-sm text-slate-500">{patient.serialNo}</td>
-                        <td className="px-6 py-4">
+                        <td className="px-4 md:px-6 py-3 md:py-4 font-mono text-sm text-slate-500">{patient.serialNo}</td>
+                        <td className="px-4 md:px-6 py-3 md:py-4">
                           <p className={cn("font-bold", darkMode ? "text-white" : "text-slate-900")}>{patient.name}</p>
                           <p className="text-xs text-slate-500">{formatDate(patient.createdAt)}</p>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-4 md:px-6 py-3 md:py-4">
                           <span className={cn(
-                            "px-3 py-1 rounded-full text-xs font-bold",
+                            "px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap",
                             darkMode ? "bg-blue-900/30 text-blue-400" : "bg-blue-50 text-blue-600"
                           )}>
                             {patient.serviceType}
                           </span>
                         </td>
-                        <td className="px-6 py-4">
-                          <p className={cn("text-sm font-extrabold", darkMode ? "text-white" : "text-slate-900")}>{formatCurrency(patient.amountPaid)} / {formatCurrency(patient.amountDue)}</p>
+                        <td className="px-4 md:px-6 py-3 md:py-4">
+                          <p className={cn("text-sm font-extrabold whitespace-nowrap", darkMode ? "text-white" : "text-slate-900")}>{formatCurrency(patient.amountPaid)} / {formatCurrency(patient.amountDue)}</p>
                           <div className={cn("w-full h-1.5 rounded-full mt-1", darkMode ? "bg-white/10" : "bg-slate-100")}>
-                            <div 
-                              className="bg-blue-500 h-full rounded-full transition-all" 
+                            <div
+                              className="bg-blue-500 h-full rounded-full transition-all"
                               style={{ width: `${Math.min((patient.amountPaid / patient.amountDue) * 100, 100)}%` }}
                             ></div>
                           </div>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-4 md:px-6 py-3 md:py-4">
                           {patient.status === 'Paid' ? (
-                            <span className="flex items-center gap-1 text-emerald-500 font-bold text-sm">
+                            <span className="flex items-center gap-1 text-emerald-500 font-bold text-sm whitespace-nowrap">
                               <CheckCircle2 size={16} /> Paid
                             </span>
                           ) : (
-                            <span className="flex items-center gap-1 text-amber-500 font-bold text-sm">
+                            <span className="flex items-center gap-1 text-amber-500 font-bold text-sm whitespace-nowrap">
                               <AlertCircle size={16} /> Unpaid
                             </span>
                           )}
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
+                        <td className="px-4 md:px-6 py-3 md:py-4">
+                          <div className="flex items-center gap-1 md:gap-2">
                             <button 
                               onClick={() => { setEditingPatient(patient); setShowAddModal(true); }}
                               className={cn("p-2 rounded-lg transition-colors", darkMode ? "hover:bg-blue-900/30 text-blue-400" : "hover:bg-blue-50 text-blue-600")}
@@ -793,6 +820,7 @@ function AppContent() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
             </div>
           )}
@@ -884,23 +912,23 @@ function AddPatientModal({ onClose, patient, darkMode }: { onClose: () => void, 
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-end sm:items-center justify-center z-50 sm:p-4">
       <div className={cn(
-        "rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto transition-all duration-300",
+        "rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto transition-all duration-300",
         darkMode ? "glass-card" : "bg-white"
       )}>
         <div className={cn(
-          "p-8 border-b flex items-center justify-between sticky top-0 z-10 transition-colors",
+          "p-4 md:p-8 border-b flex items-center justify-between sticky top-0 z-10 transition-colors",
           darkMode ? "bg-dark-bg/80 backdrop-blur-md border-white/10" : "bg-white border-slate-100"
         )}>
-          <h2 className={cn("text-2xl font-bold", darkMode ? "text-white" : "text-slate-900")}>{patient ? 'Edit Patient' : 'Add New Patient'}</h2>
+          <h2 className={cn("text-xl md:text-2xl font-bold", darkMode ? "text-white" : "text-slate-900")}>{patient ? 'Edit Patient' : 'Add New Patient'}</h2>
           <button onClick={onClose} className={cn("p-2 rounded-full transition-colors", darkMode ? "hover:bg-white/10 text-slate-400" : "hover:bg-slate-100 text-slate-500")}>
             <X size={24} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-8 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <form onSubmit={handleSubmit} className="p-4 md:p-8 space-y-5 md:space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
             <div className="space-y-2">
               <label className={cn("text-sm font-bold", darkMode ? "text-slate-400" : "text-slate-700")}>Patient Name</label>
               <input 
@@ -1134,6 +1162,7 @@ function AnalyticsView({ transactions, patients, darkMode }: { transactions: Tra
 
   const chartOptions = {
     responsive: true,
+    maintainAspectRatio: true,
     plugins: {
       legend: {
         position: 'bottom' as const,
@@ -1156,18 +1185,18 @@ function AnalyticsView({ transactions, patients, darkMode }: { transactions: Tra
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <div className="space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div>
-        <h2 className={cn("text-3xl font-black tracking-tight", darkMode ? "text-white" : "text-slate-900")}>Analytics & Insights</h2>
-        <p className={cn("mt-1 font-medium", darkMode ? "text-slate-400" : "text-slate-500")}>Financial performance and service trends</p>
+        <h2 className={cn("text-2xl md:text-3xl font-black tracking-tight", darkMode ? "text-white" : "text-slate-900")}>Analytics & Insights</h2>
+        <p className={cn("mt-1 font-medium text-sm md:text-base", darkMode ? "text-slate-400" : "text-slate-500")}>Financial performance and service trends</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-8">
         <div className={cn(
-          "p-8 rounded-3xl border transition-all shadow-xl",
+          "p-4 md:p-8 rounded-2xl md:rounded-3xl border transition-all shadow-xl",
           darkMode ? "glass-card border-white/10" : "bg-white border-slate-100 shadow-sm"
         )}>
-          <h3 className={cn("font-bold mb-6", darkMode ? "text-white" : "text-slate-900")}>Monthly Revenue vs Expenses</h3>
+          <h3 className={cn("font-bold mb-4 md:mb-6 text-sm md:text-base", darkMode ? "text-white" : "text-slate-900")}>Monthly Revenue vs Expenses</h3>
           <Bar 
             data={{
               labels: monthlyData.months,
@@ -1191,10 +1220,10 @@ function AnalyticsView({ transactions, patients, darkMode }: { transactions: Tra
         </div>
 
         <div className={cn(
-          "p-8 rounded-3xl border transition-all shadow-xl",
+          "p-4 md:p-8 rounded-2xl md:rounded-3xl border transition-all shadow-xl",
           darkMode ? "glass-card border-white/10" : "bg-white border-slate-100 shadow-sm"
         )}>
-          <h3 className={cn("font-bold mb-6", darkMode ? "text-white" : "text-slate-900")}>Service Distribution</h3>
+          <h3 className={cn("font-bold mb-4 md:mb-6 text-sm md:text-base", darkMode ? "text-white" : "text-slate-900")}>Service Distribution</h3>
           <div className="max-w-xs mx-auto">
             <Pie 
               data={{
@@ -1292,21 +1321,21 @@ function InventoryView({ inventory, darkMode }: { inventory: InventoryItem[], da
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className={cn("text-3xl font-black tracking-tight", darkMode ? "text-white" : "text-slate-900")}>Stock & Inventory</h2>
-          <p className={cn("mt-1 font-medium", darkMode ? "text-slate-400" : "text-slate-500")}>Track your dental supplies</p>
+          <h2 className={cn("text-2xl md:text-3xl font-black tracking-tight", darkMode ? "text-white" : "text-slate-900")}>Stock & Inventory</h2>
+          <p className={cn("mt-1 font-medium text-sm md:text-base", darkMode ? "text-slate-400" : "text-slate-500")}>Track your dental supplies</p>
         </div>
-        <button 
+        <button
           onClick={() => setShowAdd(true)}
-          className="bg-blue-600 text-white px-6 py-3 rounded-2xl font-bold hover:bg-blue-700 transition-all flex items-center gap-2 shadow-lg shadow-blue-100/20"
+          className="bg-blue-600 text-white px-4 md:px-6 py-2.5 md:py-3 rounded-2xl font-bold hover:bg-blue-700 transition-all flex items-center gap-2 shadow-lg shadow-blue-100/20 text-sm md:text-base self-start sm:self-auto"
         >
-          <Plus size={20} /> Add Item
+          <Plus size={18} /> Add Item
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {inventory.map(item => (
           <div key={item.id} className={cn(
             "p-6 rounded-3xl border transition-all duration-300 group hover:scale-[1.02]",
@@ -1518,61 +1547,62 @@ function AppointmentsView({ appointments, patients, darkMode }: { appointments: 
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className={cn("text-3xl font-black tracking-tight", darkMode ? "text-white" : "text-slate-900")}>Appointment Calendar</h2>
-          <p className={cn("mt-1 font-medium", darkMode ? "text-slate-400" : "text-slate-500")}>Manage upcoming patient visits</p>
+          <h2 className={cn("text-2xl md:text-3xl font-black tracking-tight", darkMode ? "text-white" : "text-slate-900")}>Appointment Calendar</h2>
+          <p className={cn("mt-1 font-medium text-sm md:text-base", darkMode ? "text-slate-400" : "text-slate-500")}>Manage upcoming patient visits</p>
         </div>
-        <button 
+        <button
           onClick={() => setShowAdd(true)}
-          className="bg-blue-600 text-white px-6 py-3 rounded-2xl font-bold hover:bg-blue-700 transition-all flex items-center gap-2 shadow-lg shadow-blue-100/20"
+          className="bg-blue-600 text-white px-4 md:px-6 py-2.5 md:py-3 rounded-2xl font-bold hover:bg-blue-700 transition-all flex items-center gap-2 shadow-lg shadow-blue-100/20 text-sm md:text-base self-start sm:self-auto"
         >
-          <Plus size={20} /> Schedule Appointment
+          <Plus size={18} /> <span className="hidden sm:inline">Schedule Appointment</span><span className="sm:hidden">Schedule</span>
         </button>
       </div>
 
       <div className={cn(
-        "rounded-3xl shadow-xl overflow-hidden border transition-all",
+        "rounded-2xl md:rounded-3xl shadow-xl overflow-hidden border transition-all",
         darkMode ? "glass-card border-white/10" : "bg-white border-slate-100 shadow-sm"
       )}>
-        <table className="w-full text-left border-collapse">
+        <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse min-w-[600px]">
           <thead>
             <tr className={cn(
               "text-xs font-bold uppercase tracking-wider transition-colors",
               darkMode ? "bg-white/5 text-slate-400" : "bg-slate-50 border-b border-slate-100 text-slate-500"
             )}>
-              <th className="px-8 py-4">Date & Time</th>
-              <th className="px-8 py-4">Patient</th>
-              <th className="px-8 py-4">Service</th>
-              <th className="px-8 py-4">Status</th>
-              <th className="px-8 py-4 text-right">Actions</th>
+              <th className="px-4 md:px-8 py-3 md:py-4">Date & Time</th>
+              <th className="px-4 md:px-8 py-3 md:py-4">Patient</th>
+              <th className="px-4 md:px-8 py-3 md:py-4">Service</th>
+              <th className="px-4 md:px-8 py-3 md:py-4">Status</th>
+              <th className="px-4 md:px-8 py-3 md:py-4 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className={cn("divide-y transition-colors", darkMode ? "divide-white/10" : "divide-slate-100")}>
             {appointments.map(appt => (
               <tr key={appt.id} className={cn("group transition-colors", darkMode ? "hover:bg-white/5" : "hover:bg-slate-50/50")}>
-                <td className="px-8 py-5">
+                <td className="px-4 md:px-8 py-4 md:py-5">
                   <p className={cn("font-bold", darkMode ? "text-white" : "text-slate-900")}>{formatDate(appt.date)}</p>
                   <p className="text-xs text-slate-500 font-bold">{appt.time}</p>
                 </td>
-                <td className={cn("px-8 py-5 font-bold", darkMode ? "text-white" : "text-slate-900")}>{appt.patientName}</td>
-                <td className="px-8 py-5">
+                <td className={cn("px-4 md:px-8 py-4 md:py-5 font-bold", darkMode ? "text-white" : "text-slate-900")}>{appt.patientName}</td>
+                <td className="px-4 md:px-8 py-4 md:py-5">
                   <span className={cn(
-                    "px-3 py-1 rounded-full text-xs font-bold",
+                    "px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap",
                     darkMode ? "bg-accent-teal/10 text-accent-teal" : "bg-blue-50 text-blue-600"
                   )}>{appt.serviceType}</span>
                 </td>
-                <td className="px-8 py-5">
+                <td className="px-4 md:px-8 py-4 md:py-5">
                   <span className={cn(
-                    "px-3 py-1 rounded-full text-xs font-bold",
-                    appt.status === 'Completed' 
+                    "px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap",
+                    appt.status === 'Completed'
                       ? (darkMode ? "bg-green-500/10 text-green-400" : "bg-emerald-50 text-emerald-600")
                       : (darkMode ? "bg-blue-500/10 text-blue-400" : "bg-blue-50 text-blue-600")
                   )}>{appt.status}</span>
                 </td>
-                <td className="px-8 py-5 text-right">
-                  <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <td className="px-4 md:px-8 py-4 md:py-5 text-right">
+                  <div className="flex items-center justify-end gap-2">
                     <button 
                       onClick={async () => {
                         try {
@@ -1603,15 +1633,16 @@ function AppointmentsView({ appointments, patients, darkMode }: { appointments: 
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {showAdd && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <form onSubmit={handleAdd} className={cn(
-            "rounded-3xl p-8 max-w-md w-full space-y-6 shadow-2xl transition-all duration-300",
+            "rounded-3xl p-6 md:p-8 max-w-md w-full space-y-6 shadow-2xl transition-all duration-300",
             darkMode ? "glass-card" : "bg-white"
           )}>
-            <h2 className={cn("text-2xl font-bold", darkMode ? "text-white" : "text-slate-900")}>Schedule Appointment</h2>
+            <h2 className={cn("text-xl md:text-2xl font-bold", darkMode ? "text-white" : "text-slate-900")}>Schedule Appointment</h2>
             <div className="space-y-4">
               <div className="space-y-2">
                 <label className={cn("text-sm font-bold", darkMode ? "text-slate-400" : "text-slate-700")}>Select Patient</label>
@@ -1814,18 +1845,19 @@ function PrescriptionsView({ patients, prescriptions, doctorProfile, user, darkM
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+    <div className="max-w-6xl mx-auto space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h2 className={cn("text-4xl font-black tracking-tight", darkMode ? "text-white" : "text-slate-900")}>Prescriptions</h2>
-          <p className={cn("mt-1 font-medium text-lg", darkMode ? "text-slate-400" : "text-slate-500")}>Write and manage patient prescriptions</p>
+          <h2 className={cn("text-2xl md:text-4xl font-black tracking-tight", darkMode ? "text-white" : "text-slate-900")}>Prescriptions</h2>
+          <p className={cn("mt-1 font-medium text-sm md:text-lg", darkMode ? "text-slate-400" : "text-slate-500")}>Write and manage patient prescriptions</p>
         </div>
-        <button 
+        <button
           onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-blue-200 transition-all active:scale-95"
+          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-bold shadow-lg shadow-blue-200 transition-all active:scale-95 text-sm md:text-base self-start sm:self-auto"
         >
-          <PlusCircle size={20} />
-          Write Prescription
+          <PlusCircle size={18} />
+          <span className="hidden sm:inline">Write Prescription</span>
+          <span className="sm:hidden">Prescribe</span>
         </button>
       </div>
 
@@ -1838,7 +1870,7 @@ function PrescriptionsView({ patients, prescriptions, doctorProfile, user, darkM
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {prescriptions.map((p) => (
           <div key={p.id} className={cn(
             "p-6 rounded-2xl border shadow-sm transition-all hover:shadow-md",
@@ -1888,25 +1920,25 @@ function PrescriptionsView({ patients, prescriptions, doctorProfile, user, darkM
       </div>
 
       {showAddModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-end sm:items-center justify-center z-50 sm:p-4">
           <div className={cn(
-            "rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto transition-all duration-300",
+            "rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto transition-all duration-300",
             darkMode ? "glass-card" : "bg-white"
           )}>
             <div className={cn(
-              "p-8 border-b flex items-center justify-between sticky top-0 z-10 transition-colors",
+              "p-4 md:p-8 border-b flex items-center justify-between sticky top-0 z-10 transition-colors",
               darkMode ? "bg-dark-bg/80 backdrop-blur-md border-white/10" : "bg-white border-slate-100"
             )}>
-              <h2 className={cn("text-2xl font-bold", darkMode ? "text-white" : "text-slate-900")}>Write Prescription</h2>
+              <h2 className={cn("text-xl md:text-2xl font-bold", darkMode ? "text-white" : "text-slate-900")}>Write Prescription</h2>
               <button onClick={() => setShowAddModal(false)} className={cn("p-2 rounded-full transition-colors", darkMode ? "hover:bg-white/10 text-slate-400" : "hover:bg-slate-100 text-slate-500")}>
                 <X size={24} />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-8 space-y-6">
+            <form onSubmit={handleSubmit} className="p-4 md:p-8 space-y-5 md:space-y-6">
               <div className="space-y-4">
                 <label className={cn("text-sm font-bold", darkMode ? "text-slate-400" : "text-slate-700")}>Select Patient</label>
-                <select 
+                <select
                   required
                   className={cn(
                     "w-full px-4 py-3 border-none rounded-xl focus:ring-2 focus:ring-blue-100 transition-all",
@@ -1937,7 +1969,7 @@ function PrescriptionsView({ patients, prescriptions, doctorProfile, user, darkM
                   </button>
                 </div>
                 {formData.medicines.map((m, idx) => (
-                  <div key={idx} className="grid grid-cols-1 md:grid-cols-4 gap-3 p-4 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10">
+                  <div key={idx} className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 md:p-4 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10">
                     <input 
                       placeholder="Medicine Name"
                       required
@@ -2138,14 +2170,14 @@ function ProfileView({ user, darkMode }: { user: User, darkMode: boolean }) {
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+    <div className="max-w-5xl mx-auto space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h2 className={cn("text-4xl font-black tracking-tight", darkMode ? "text-white" : "text-slate-900")}>Doctor Profile</h2>
-          <p className={cn("mt-1 font-medium text-lg", darkMode ? "text-slate-400" : "text-slate-500")}>Manage your professional identity and account security</p>
+          <h2 className={cn("text-2xl md:text-4xl font-black tracking-tight", darkMode ? "text-white" : "text-slate-900")}>Doctor Profile</h2>
+          <p className={cn("mt-1 font-medium text-sm md:text-lg", darkMode ? "text-slate-400" : "text-slate-500")}>Manage your professional identity and account security</p>
         </div>
-        <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-500 font-bold text-sm">
-          <BadgeCheck size={18} />
+        <div className="flex items-center gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-500 font-bold text-xs md:text-sm self-start sm:self-auto">
+          <BadgeCheck size={16} />
           Verified Professional
         </div>
       </div>
@@ -2340,17 +2372,17 @@ function ProfileView({ user, darkMode }: { user: User, darkMode: boolean }) {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
               {/* Password Change */}
               <div className={cn(
-                "p-8 rounded-[2.5rem] border transition-all",
+                "p-5 md:p-8 rounded-2xl md:rounded-[2.5rem] border transition-all",
                 darkMode ? "glass-card border-white/10" : "bg-white border-slate-100 shadow-sm"
               )}>
-                <div className="flex items-center gap-4 mb-8">
-                  <div className="p-3 bg-amber-500 rounded-2xl text-white">
-                    <Key size={24} />
+                <div className="flex items-center gap-3 md:gap-4 mb-6 md:mb-8">
+                  <div className="p-2.5 md:p-3 bg-amber-500 rounded-xl md:rounded-2xl text-white">
+                    <Key size={22} />
                   </div>
-                  <h3 className={cn("text-xl font-bold", darkMode ? "text-white" : "text-slate-900")}>Security</h3>
+                  <h3 className={cn("text-lg md:text-xl font-bold", darkMode ? "text-white" : "text-slate-900")}>Security</h3>
                 </div>
 
                 <div className="space-y-6">
@@ -2550,17 +2582,17 @@ function SheetsView({ transactions, darkMode }: { transactions: Transaction[], d
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className={cn("text-3xl font-black tracking-tight", darkMode ? "text-white" : "text-slate-900")}>Financial Sheets</h2>
-          <p className={cn("mt-1 font-medium", darkMode ? "text-slate-400" : "text-slate-500")}>Detailed cash flow and activity tracking</p>
+          <h2 className={cn("text-2xl md:text-3xl font-black tracking-tight", darkMode ? "text-white" : "text-slate-900")}>Financial Sheets</h2>
+          <p className={cn("mt-1 font-medium text-sm md:text-base", darkMode ? "text-slate-400" : "text-slate-500")}>Detailed cash flow and activity tracking</p>
         </div>
-        <div className="flex items-center gap-4">
-          <input 
-            type="month" 
+        <div className="flex items-center gap-2 md:gap-4 flex-wrap">
+          <input
+            type="month"
             className={cn(
-              "px-4 py-2 border rounded-xl font-bold transition-all",
+              "px-3 md:px-4 py-2 border rounded-xl font-bold transition-all text-sm md:text-base",
               darkMode ? "bg-white/5 text-white border-white/10" : "bg-white border-slate-200 text-slate-900"
             )}
             value={filterMonth}
@@ -2570,79 +2602,80 @@ function SheetsView({ transactions, darkMode }: { transactions: Transaction[], d
             "p-2 border rounded-xl transition-all",
             darkMode ? "bg-white/5 border-white/10 text-slate-400 hover:bg-white/10" : "bg-white border-slate-200 hover:bg-slate-50 text-slate-600"
           )}>
-            <Download size={20} />
+            <Download size={18} />
           </button>
           <button
             onClick={handlePrint}
             className={cn(
-              "flex items-center gap-2 px-4 py-2 border rounded-xl font-bold transition-all",
+              "flex items-center gap-2 px-3 md:px-4 py-2 border rounded-xl font-bold transition-all text-sm md:text-base",
               darkMode ? "bg-blue-500/20 border-blue-500/30 text-blue-400 hover:bg-blue-500/30" : "bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-100"
             )}
           >
             <Printer size={18} />
-            <span>Print</span>
+            <span className="hidden sm:inline">Print</span>
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-6">
         <div className={cn(
-          "p-6 rounded-3xl border transition-all",
+          "p-4 md:p-6 rounded-2xl md:rounded-3xl border transition-all",
           darkMode ? "bg-green-500/10 border-green-500/20" : "bg-emerald-50 border-emerald-100"
         )}>
-          <p className={cn("text-sm font-bold mb-1", darkMode ? "text-green-400" : "text-emerald-600")}>Monthly Income</p>
-          <h3 className={cn("text-2xl font-black", darkMode ? "text-white" : "text-emerald-700")}>{formatCurrency(totals.income)}</h3>
+          <p className={cn("text-xs md:text-sm font-bold mb-1", darkMode ? "text-green-400" : "text-emerald-600")}>Monthly Income</p>
+          <h3 className={cn("text-xl md:text-2xl font-black", darkMode ? "text-white" : "text-emerald-700")}>{formatCurrency(totals.income)}</h3>
         </div>
         <div className={cn(
-          "p-6 rounded-3xl border transition-all",
+          "p-4 md:p-6 rounded-2xl md:rounded-3xl border transition-all",
           darkMode ? "bg-red-500/10 border-red-500/20" : "bg-red-50 border-red-100"
         )}>
-          <p className={cn("text-sm font-bold mb-1", darkMode ? "text-red-400" : "text-red-600")}>Monthly Expenses</p>
-          <h3 className={cn("text-2xl font-black", darkMode ? "text-white" : "text-red-700")}>{formatCurrency(totals.expense)}</h3>
+          <p className={cn("text-xs md:text-sm font-bold mb-1", darkMode ? "text-red-400" : "text-red-600")}>Monthly Expenses</p>
+          <h3 className={cn("text-xl md:text-2xl font-black", darkMode ? "text-white" : "text-red-700")}>{formatCurrency(totals.expense)}</h3>
         </div>
         <div className={cn(
-          "p-6 rounded-3xl border transition-all",
+          "p-4 md:p-6 rounded-2xl md:rounded-3xl border transition-all",
           darkMode ? "bg-blue-500/10 border-blue-500/20" : "bg-blue-50 border-blue-100"
         )}>
-          <p className={cn("text-sm font-bold mb-1", darkMode ? "text-blue-400" : "text-blue-600")}>Net Balance</p>
-          <h3 className={cn("text-2xl font-black", darkMode ? "text-white" : "text-blue-700")}>{formatCurrency(totals.balance)}</h3>
+          <p className={cn("text-xs md:text-sm font-bold mb-1", darkMode ? "text-blue-400" : "text-blue-600")}>Net Balance</p>
+          <h3 className={cn("text-xl md:text-2xl font-black", darkMode ? "text-white" : "text-blue-700")}>{formatCurrency(totals.balance)}</h3>
         </div>
       </div>
 
       <div className={cn(
-        "rounded-3xl shadow-xl overflow-hidden border transition-all",
+        "rounded-2xl md:rounded-3xl shadow-xl overflow-hidden border transition-all",
         darkMode ? "glass-card border-white/10" : "bg-white border-slate-100 shadow-sm"
       )}>
-        <table className="w-full text-left border-collapse">
+        <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse min-w-[500px]">
           <thead>
             <tr className={cn(
               "text-xs font-bold uppercase tracking-wider transition-colors",
               darkMode ? "bg-white/5 text-slate-400" : "bg-slate-50 border-b border-slate-100 text-slate-500"
             )}>
-              <th className="px-8 py-4">Date</th>
-              <th className="px-8 py-4">Description</th>
-              <th className="px-8 py-4">Category</th>
-              <th className="px-8 py-4">Amount</th>
+              <th className="px-4 md:px-8 py-3 md:py-4">Date</th>
+              <th className="px-4 md:px-8 py-3 md:py-4">Description</th>
+              <th className="px-4 md:px-8 py-3 md:py-4">Category</th>
+              <th className="px-4 md:px-8 py-3 md:py-4">Amount</th>
             </tr>
           </thead>
           <tbody className={cn("divide-y transition-colors", darkMode ? "divide-white/10" : "divide-slate-100")}>
             {filteredTransactions.map(t => (
               <tr key={t.id} className={cn("group transition-colors", darkMode ? "hover:bg-white/5" : "hover:bg-slate-50/50")}>
-                <td className="px-8 py-5">
-                  <div className={cn("font-bold", darkMode ? "text-white" : "text-slate-900")}>{formatDate(t.date)}</div>
+                <td className="px-4 md:px-8 py-4 md:py-5">
+                  <div className={cn("font-bold whitespace-nowrap", darkMode ? "text-white" : "text-slate-900")}>{formatDate(t.date)}</div>
                 </td>
-                <td className="px-8 py-5">
+                <td className="px-4 md:px-8 py-4 md:py-5">
                   <div className={cn("font-bold", darkMode ? "text-white" : "text-slate-900")}>{t.description}</div>
                   <div className={cn("text-xs", darkMode ? "text-slate-500" : "text-slate-500")}>{t.patientName || 'General'}</div>
                 </td>
-                <td className="px-8 py-5">
+                <td className="px-4 md:px-8 py-4 md:py-5">
                   <span className={cn(
-                    "px-3 py-1 rounded-full text-xs font-bold",
+                    "px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap",
                     darkMode ? "bg-white/10 text-slate-400" : "bg-slate-100 text-slate-600"
                   )}>{t.category}</span>
                 </td>
                 <td className={cn(
-                  "px-8 py-5 font-black",
+                  "px-4 md:px-8 py-4 md:py-5 font-black whitespace-nowrap",
                   t.type === 'Income' ? "text-green-500" : "text-red-500"
                 )}>
                   {t.type === 'Income' ? '+' : '-'}{formatCurrency(t.amount)}
@@ -2651,6 +2684,7 @@ function SheetsView({ transactions, darkMode }: { transactions: Transaction[], d
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );
