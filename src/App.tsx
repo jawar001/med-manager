@@ -38,7 +38,8 @@ import {
   BadgeCheck,
   ClipboardList,
   PlusCircle,
-  Mail
+  Mail,
+  Printer
 } from 'lucide-react';
 import { 
   collection, 
@@ -2484,6 +2485,70 @@ function SheetsView({ transactions, darkMode }: { transactions: Transaction[], d
     return { income, expense, balance: income - expense };
   }, [filteredTransactions]);
 
+  const handlePrint = () => {
+    const monthLabel = new Date(filterMonth + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const rows = filteredTransactions.map(t =>
+      `<tr>
+        <td style="padding:10px 16px;border-bottom:1px solid #e2e8f0;">${formatDate(t.date)}</td>
+        <td style="padding:10px 16px;border-bottom:1px solid #e2e8f0;">${t.description}<br/><span style="color:#94a3b8;font-size:12px;">${t.patientName || 'General'}</span></td>
+        <td style="padding:10px 16px;border-bottom:1px solid #e2e8f0;">${t.category}</td>
+        <td style="padding:10px 16px;border-bottom:1px solid #e2e8f0;font-weight:700;color:${t.type === 'Income' ? '#22c55e' : '#ef4444'};">${t.type === 'Income' ? '+' : '-'}${formatCurrency(t.amount)}</td>
+      </tr>`
+    ).join('');
+
+    printWindow.document.write(`
+      <html>
+      <head>
+        <title>KHAN DENTAL - Financial Sheet - ${monthLabel}</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; padding: 40px; color: #0f172a; }
+          h1 { font-size: 24px; margin: 0; color: #2563eb; }
+          .subtitle { color: #64748b; font-size: 13px; margin-top: 4px; }
+          .meta { margin: 20px 0; font-size: 14px; color: #334155; }
+          .summary { display: flex; gap: 24px; margin: 24px 0; }
+          .summary-card { flex: 1; padding: 16px; border-radius: 12px; border: 1px solid #e2e8f0; }
+          .summary-card h3 { margin: 0 0 4px; font-size: 13px; font-weight: 600; }
+          .summary-card p { margin: 0; font-size: 20px; font-weight: 800; }
+          table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 14px; }
+          thead th { text-align: left; padding: 10px 16px; background: #f8fafc; border-bottom: 2px solid #e2e8f0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; font-weight: 700; }
+          .footer { margin-top: 40px; text-align: center; color: #94a3b8; font-size: 12px; font-style: italic; }
+          @media print { body { padding: 20px; } }
+        </style>
+      </head>
+      <body>
+        <h1>KHAN DENTAL</h1>
+        <div class="subtitle">Professional Dental Care & Surgery</div>
+        <div class="meta">Monthly Financial Sheet &mdash; <strong>${monthLabel}</strong></div>
+        <div class="summary">
+          <div class="summary-card" style="background:#f0fdf4;border-color:#bbf7d0;">
+            <h3 style="color:#16a34a;">Income</h3>
+            <p style="color:#15803d;">${formatCurrency(totals.income)}</p>
+          </div>
+          <div class="summary-card" style="background:#fef2f2;border-color:#fecaca;">
+            <h3 style="color:#dc2626;">Expenses</h3>
+            <p style="color:#b91c1c;">${formatCurrency(totals.expense)}</p>
+          </div>
+          <div class="summary-card" style="background:#eff6ff;border-color:#bfdbfe;">
+            <h3 style="color:#2563eb;">Net Balance</h3>
+            <p style="color:#1d4ed8;">${formatCurrency(totals.balance)}</p>
+          </div>
+        </div>
+        <table>
+          <thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th></tr></thead>
+          <tbody>${rows.length > 0 ? rows : '<tr><td colspan="4" style="padding:20px;text-align:center;color:#94a3b8;">No transactions for this month</td></tr>'}</tbody>
+        </table>
+        <div class="footer">Generated on ${new Date().toLocaleDateString('en-US', { day: '2-digit', month: 'long', year: 'numeric' })} &bull; Khan Dental Practice Management</div>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="flex items-center justify-between">
@@ -2506,6 +2571,16 @@ function SheetsView({ transactions, darkMode }: { transactions: Transaction[], d
             darkMode ? "bg-white/5 border-white/10 text-slate-400 hover:bg-white/10" : "bg-white border-slate-200 hover:bg-slate-50 text-slate-600"
           )}>
             <Download size={20} />
+          </button>
+          <button
+            onClick={handlePrint}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 border rounded-xl font-bold transition-all",
+              darkMode ? "bg-blue-500/20 border-blue-500/30 text-blue-400 hover:bg-blue-500/30" : "bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-100"
+            )}
+          >
+            <Printer size={18} />
+            <span>Print</span>
           </button>
         </div>
       </div>
