@@ -828,8 +828,8 @@ function AddPatientModal({ onClose, patient, darkMode }: { onClose: () => void, 
     amountPaid: patient?.amountPaid || 0,
     paymentType: patient?.paymentType || 'Direct' as const,
     medicalHistory: patient?.medicalHistory?.join(', ') || '',
-    allergies: patient?.allergies || '',
-    chronicConditions: patient?.chronicConditions || '',
+    allergies: patient?.allergies?.join(', ') || '',
+    chronicConditions: patient?.chronicConditions?.join(', ') || '',
   });
 
   const [installments, setInstallments] = useState(patient?.installments || []);

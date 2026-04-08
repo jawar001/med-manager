@@ -43,8 +43,8 @@ export interface Patient {
   installments: Installment[];
   status: "Paid" | "Unpaid";
   medicalHistory: string[];
-  allergies: string;
-  chronicConditions: string;
+  allergies: string[];
+  chronicConditions: string[];
   createdAt: string;
   updatedAt: string;
 }
