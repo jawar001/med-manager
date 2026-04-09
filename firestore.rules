@@ -1,80 +1,7 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // ===============================================================
-    // Assumed Data Model
-    // ===============================================================
-    //
-    // Collection: patients
-    // Fields:
-    //   - serialNo: string (required)
-    //   - name: string (required, size < 100)
-    //   - serviceType: string (required)
-    //   - amountDue: number (required, positive)
-    //   - amountPaid: number (required, positive)
-    //   - paymentType: string (required, enum: ['Direct', 'Installments'])
-    //   - status: string (required, enum: ['Paid', 'Unpaid'])
-    //   - medicalHistory: list (required, strings)
-    //   - allergies: string (optional, size < 500)
-    //   - chronicConditions: string (optional, size < 500)
-    //   - createdAt: string (required, ISO 8601)
-    //   - updatedAt: string (required, ISO 8601)
-    //
-    // Collection: appointments
-    // Fields:
-    //   - patientId: string (required)
-    //   - patientName: string (required, size < 100)
-    //   - date: string (required, ISO 8601 date)
-    //   - time: string (required)
-    //   - serviceType: string (required)
-    //   - status: string (required, enum: ['Scheduled', 'Completed', 'Cancelled'])
-    //
-    // Collection: inventory
-    // Fields:
-    //   - name: string (required, size < 100)
-    //   - category: string (required)
-    //   - medicineType: string (optional)
-    //   - quantity: number (required, positive)
-    //   - unit: string (required)
-    //   - minThreshold: number (required, positive)
-    //   - lastRestocked: string (required, ISO 8601 date)
-    //
-    // Collection: transactions
-    // Fields:
-    //   - patientId: string (optional)
-    //   - patientName: string (optional)
-    //   - amount: number (required, positive)
-    //   - type: string (required, enum: ['Income', 'Expense'])
-    //   - category: string (required)
-    //   - date: string (required, ISO 8601 date)
-    //   - description: string (required, size < 500)
-    //
-    // Collection: doctors
-    // Fields:
-    //   - uid: string (required)
-    //   - specialization: string (required)
-    //   - licenseNo: string (required)
-    //   - clinicName: string (required)
-    //   - phone: string (optional)
-    //   - bio: string (optional)
-    //   - address: string (optional)
-    //
-    // Collection: prescriptions
-    // Fields:
-    //   - patientId: string (required)
-    //   - patientName: string (required)
-    //   - patientEmail: string (required)
-    //   - doctorName: string (required)
-    //   - date: string (required, ISO 8601)
-    //   - medicines: list (required)
-    //   - instructions: string (optional)
-    //
-    // ===============================================================
 
-    // ===============================================================
-    // Helper Functions
-    // ===============================================================
-    
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -86,131 +13,53 @@ service cloud.firestore {
           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
     }
 
-    function hasRequiredFields(fields) {
-      return request.resource.data.keys().hasAll(fields);
-    }
-
-    function hasOnlyAllowedFields(fields) {
-      return request.resource.data.keys().hasOnly(fields);
-    }
-
-    function isValidString(field, maxLen) {
-      return request.resource.data[field] is string && request.resource.data[field].size() <= maxLen;
-    }
-
-    function isValidNumber(field) {
-      return request.resource.data[field] is number && request.resource.data[field] >= 0;
-    }
-
-    function isValidEmail(email) {
-      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
-    }
-
-    // ===============================================================
-    // Domain Validators
-    // ===============================================================
-
-    function isValidPatient(data) {
-      return hasRequiredFields(['serialNo', 'name', 'email', 'serviceType', 'amountDue', 'amountPaid', 'paymentType', 'status', 'createdAt', 'updatedAt']) &&
-             isValidString('name', 100) &&
-             isValidEmail(data.email) &&
-             isValidNumber('amountDue') &&
-             isValidNumber('amountPaid') &&
-             data.paymentType in ['Direct', 'Installments'] &&
-             data.status in ['Paid', 'Unpaid'] &&
-             data.medicalHistory is list &&
-             data.allergies is list &&
-             data.chronicConditions is list;
-    }
-
-    function isValidAppointment(data) {
-      return hasRequiredFields(['patientId', 'patientName', 'date', 'time', 'serviceType', 'status']) &&
-             isValidString('patientName', 100) &&
-             data.status in ['Scheduled', 'Completed', 'Cancelled'];
-    }
-
-    function isValidInventoryItem(data) {
-      return hasRequiredFields(['name', 'category', 'quantity', 'unit', 'minThreshold', 'lastRestocked']) &&
-             isValidString('name', 100) &&
-             isValidNumber('quantity') &&
-             isValidNumber('minThreshold');
-    }
-
-    function isValidTransaction(data) {
-      return hasRequiredFields(['amount', 'type', 'category', 'date', 'description']) &&
-             isValidNumber('amount') &&
-             data.type in ['Income', 'Expense'] &&
-             isValidString('description', 500);
-    }
-
-    function isValidDoctor(data) {
-      return hasRequiredFields(['uid', 'specialization', 'licenseNo', 'clinicName']) &&
-             isValidString('specialization', 100) &&
-             isValidString('licenseNo', 50) &&
-             isValidString('clinicName', 100) &&
-             (!('photoURL' in data) || data.photoURL is string);
-    }
-
-    function isValidPrescription(data) {
-      return hasRequiredFields(['patientId', 'patientName', 'patientEmail', 'doctorName', 'date', 'medicines']) &&
-             isValidString('patientName', 100) &&
-             isValidEmail(data.patientEmail) &&
-             data.medicines is list;
-    }
-
-    // ===============================================================
-    // Rules
-    // ===============================================================
-
-    match /prescriptions/{prescriptionId} {
-      allow read, list, get: if isAuthenticated();
-      allow create, update: if isAuthenticated() && isValidPrescription(request.resource.data);
-      allow delete: if isAdmin();
-    }
-
-    match /users/{userId} {
-      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
-      allow create: if isAuthenticated() && request.auth.uid == userId && 
-                    hasOnlyAllowedFields(['name', 'email', 'role', 'photoURL']) &&
-                    request.resource.data.role == 'staff'; // Default role
-      allow update: if isAuthenticated() && (
-                      (request.auth.uid == userId && hasOnlyAllowedFields(['name', 'email', 'role', 'photoURL']) && request.resource.data.role == resource.data.role) ||
-                      isAdmin()
-                    );
-    }
-
+    // --- Patients ---
     match /patients/{patientId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && isValidPatient(request.resource.data);
-      allow update: if isAuthenticated() && isValidPatient(request.resource.data);
-      allow delete: if isAdmin();
+      allow create, update: if isAuthenticated();
+      allow delete: if isAuthenticated();
     }
 
+    // --- Appointments ---
     match /appointments/{appointmentId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && isValidAppointment(request.resource.data);
-      allow update: if isAuthenticated() && isValidAppointment(request.resource.data);
-      allow delete: if isAdmin();
+      allow create, update: if isAuthenticated();
+      allow delete: if isAuthenticated();
     }
 
+    // --- Inventory ---
     match /inventory/{itemId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && isValidInventoryItem(request.resource.data);
-      allow update: if isAuthenticated() && isValidInventoryItem(request.resource.data);
-      allow delete: if isAdmin();
+      allow create, update: if isAuthenticated();
+      allow delete: if isAuthenticated();
     }
 
+    // --- Transactions ---
     match /transactions/{transactionId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && isValidTransaction(request.resource.data);
-      allow update: if isAuthenticated() && isValidTransaction(request.resource.data);
-      allow delete: if isAdmin();
+      allow create, update: if isAuthenticated();
+      allow delete: if isAuthenticated();
     }
 
+    // --- Prescriptions ---
+    match /prescriptions/{prescriptionId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+
+    // --- Doctors (profile) ---
     match /doctors/{doctorId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.uid && isValidDoctor(request.resource.data);
-      allow update: if isAuthenticated() && request.auth.uid == resource.data.uid && isValidDoctor(request.resource.data);
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.uid;
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.uid;
+    }
+
+    // --- Users (roles) ---
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
     }
   }
 }

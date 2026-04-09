@@ -41,19 +41,15 @@ import {
   Mail,
   Printer
 } from 'lucide-react';
-import { 
-  collection, 
-  onSnapshot, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  doc, 
-  query, 
-  orderBy, 
-  serverTimestamp,
-  getDocs,
-  where,
-  getDocFromServer,
+import {
+  collection,
+  onSnapshot,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
+  query,
+  orderBy,
   setDoc,
   getDoc
 } from 'firebase/firestore';
@@ -120,46 +116,24 @@ enum OperationType {
   WRITE = 'write',
 }
 
-interface FirestoreErrorInfo {
-  error: string;
-  operationType: OperationType;
-  path: string | null;
-  authInfo: {
-    userId: string | undefined;
-    email: string | null | undefined;
-    emailVerified: boolean | undefined;
-    isAnonymous: boolean | undefined;
-    tenantId: string | null | undefined;
-    providerInfo: {
-      providerId: string;
-      displayName: string | null;
-      email: string | null;
-      photoUrl: string | null;
-    }[];
+function getFirestoreErrorMessage(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error);
+  if (raw.includes('permission-denied') || raw.includes('PERMISSION_DENIED')) {
+    return 'Permission denied. Please check Firestore security rules are deployed.';
   }
+  if (raw.includes('not-found')) {
+    return 'Document not found.';
+  }
+  if (raw.includes('unavailable') || raw.includes('offline')) {
+    return 'Network error. Please check your connection.';
+  }
+  return raw;
 }
 
-function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
-  const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
-    authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-      tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData.map(provider => ({
-        providerId: provider.providerId,
-        displayName: provider.displayName,
-        email: provider.email,
-        photoUrl: provider.photoURL
-      })) || []
-    },
-    operationType,
-    path
-  };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null): string {
+  const message = getFirestoreErrorMessage(error);
+  console.error(`Firestore ${operationType} error at ${path}:`, error);
+  return message;
 }
 
 // --- Components ---
@@ -324,7 +298,7 @@ const LoginSignup = ({ darkMode }: { darkMode: boolean }) => {
   );
 };
 
-const SidebarItem = ({ icon: Icon, label, active, onClick, darkMode }: { icon: any, label: string, active: boolean, onClick: () => void, darkMode: boolean }) => (
+const SidebarItem: React.FC<{ icon: any, label: string, active: boolean, onClick: () => void, darkMode: boolean }> = ({ icon: Icon, label, active, onClick, darkMode }) => (
   <button
     onClick={onClick}
     className={cn(
@@ -453,17 +427,7 @@ function AppContent() {
       setLoading(false);
     });
 
-    // Test Firestore Connection
-    const testConnection = async () => {
-      try {
-        await getDocFromServer(doc(db, 'test', 'connection'));
-      } catch (error) {
-        if (error instanceof Error && error.message.includes('the client is offline')) {
-          console.error("Please check your Firebase configuration. The client is offline.");
-        }
-      }
-    };
-    testConnection();
+    // Firestore connectivity is verified by the onSnapshot listeners below
 
     return () => unsubscribe();
   }, []);
@@ -576,13 +540,13 @@ function AppContent() {
             { icon: Package, tab: 'inventory' as const, label: 'Inventory' },
             { icon: FileText, tab: 'sheets' as const, label: 'Sheets' },
             { icon: UserCircle, tab: 'profile' as const, label: 'Profile' },
-          ].map(({ icon, tab, label }) => (
+          ].map((item) => (
             <SidebarItem
-              key={tab}
-              icon={icon}
-              label={isSidebarOpen ? label : ""}
-              active={activeTab === tab}
-              onClick={() => { setActiveTab(tab); if (window.innerWidth < 1024) setIsSidebarOpen(false); }}
+              key={item.tab}
+              icon={item.icon}
+              label={isSidebarOpen ? item.label : ""}
+              active={activeTab === item.tab}
+              onClick={() => { setActiveTab(item.tab); if (window.innerWidth < 1024) setIsSidebarOpen(false); }}
               darkMode={darkMode}
             />
           ))}
@@ -800,13 +764,14 @@ function AppContent() {
                             >
                               <Mail size={18} />
                             </button>
-                            <button 
+                            <button
                               onClick={async () => {
                                 if (confirm("Are you sure you want to delete this patient?")) {
                                   try {
                                     await deleteDoc(doc(db, 'patients', patient.id));
                                   } catch (error) {
-                                    handleFirestoreError(error, OperationType.DELETE, `patients/${patient.id}`);
+                                    const msg = handleFirestoreError(error, OperationType.DELETE, `patients/${patient.id}`);
+                                    alert(msg);
                                   }
                                 }
                               }}
@@ -862,6 +827,8 @@ function AddPatientModal({ onClose, patient, darkMode }: { onClose: () => void, 
   });
 
   const [installments, setInstallments] = useState(patient?.installments || []);
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const handleServiceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const service = e.target.value as ServiceType;
@@ -874,10 +841,17 @@ function AddPatientModal({ onClose, patient, darkMode }: { onClose: () => void, 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
+    setSaving(true);
     const status = formData.amountPaid >= formData.amountDue ? 'Paid' : 'Unpaid';
     const patientData = {
-      ...formData,
       serialNo: patient?.serialNo || `KD-${Date.now().toString().slice(-6)}`,
+      name: formData.name,
+      email: formData.email,
+      serviceType: formData.serviceType,
+      amountDue: formData.amountDue,
+      amountPaid: formData.amountPaid,
+      paymentType: formData.paymentType,
       status,
       installments,
       medicalHistory: formData.medicalHistory.split(',').map(s => s.trim()).filter(s => s !== ''),
@@ -892,7 +866,6 @@ function AddPatientModal({ onClose, patient, darkMode }: { onClose: () => void, 
         await updateDoc(doc(db, 'patients', patient.id), patientData);
       } else {
         const docRef = await addDoc(collection(db, 'patients'), patientData);
-        // Add initial transaction if payment made
         if (formData.amountPaid > 0) {
           await addDoc(collection(db, 'transactions'), {
             patientId: docRef.id,
@@ -906,8 +879,11 @@ function AddPatientModal({ onClose, patient, darkMode }: { onClose: () => void, 
         }
       }
       onClose();
-    } catch (error) {
-      handleFirestoreError(error, patient ? OperationType.UPDATE : OperationType.CREATE, patient ? `patients/${patient.id}` : 'patients');
+    } catch (err) {
+      const msg = handleFirestoreError(err, patient ? OperationType.UPDATE : OperationType.CREATE, patient ? `patients/${patient.id}` : 'patients');
+      setError(msg);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -1121,13 +1097,20 @@ function AddPatientModal({ onClose, patient, darkMode }: { onClose: () => void, 
             >
               Cancel
             </button>
-            <button 
+            <button
               type="submit"
-              className="flex-1 px-6 py-4 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"
+              disabled={saving}
+              className={cn("flex-1 px-6 py-4 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-100", saving && "opacity-50 cursor-not-allowed")}
             >
-              {patient ? 'Update Patient' : 'Save Patient'}
+              {saving ? 'Saving...' : (patient ? 'Update Patient' : 'Save Patient')}
             </button>
           </div>
+          {error && (
+            <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-sm font-medium flex items-center gap-2">
+              <AlertCircle size={16} />
+              <span>{error}</span>
+            </div>
+          )}
         </form>
       </div>
     </div>
@@ -1259,6 +1242,7 @@ function AnalyticsView({ transactions, patients, darkMode }: { transactions: Tra
 function InventoryView({ inventory, darkMode }: { inventory: InventoryItem[], darkMode: boolean }) {
   const [showAdd, setShowAdd] = useState(false);
   const [newItem, setNewItem] = useState({ name: '', category: 'PPE & Disposables', medicineType: '', quantity: 0, unit: 'pcs', minThreshold: 5 });
+  const [error, setError] = useState('');
 
   const INVENTORY_CATEGORIES = [
     "Medicine",
@@ -1307,16 +1291,22 @@ function InventoryView({ inventory, darkMode }: { inventory: InventoryItem[], da
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
     try {
-      await addDoc(collection(db, 'inventory'), { 
-        ...newItem, 
+      await addDoc(collection(db, 'inventory'), {
+        name: newItem.name,
+        category: newItem.category,
         medicineType: newItem.category === 'Medicine' ? newItem.medicineType : '',
-        lastRestocked: new Date().toISOString() 
+        quantity: newItem.quantity,
+        unit: newItem.unit,
+        minThreshold: newItem.minThreshold,
+        lastRestocked: new Date().toISOString()
       });
       setShowAdd(false);
       setNewItem({ name: '', category: 'PPE & Disposables', medicineType: '', quantity: 0, unit: 'pcs', minThreshold: 5 });
-    } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, 'inventory');
+    } catch (err) {
+      const msg = handleFirestoreError(err, OperationType.CREATE, 'inventory');
+      setError(msg);
     }
   };
 
@@ -1377,12 +1367,12 @@ function InventoryView({ inventory, darkMode }: { inventory: InventoryItem[], da
                 )}
               </div>
               <div className="flex gap-2">
-                <button 
+                <button
                   onClick={async () => {
                     try {
                       await updateDoc(doc(db, 'inventory', item.id), { quantity: item.quantity + 1 });
                     } catch (error) {
-                      handleFirestoreError(error, OperationType.UPDATE, `inventory/${item.id}`);
+                      alert(handleFirestoreError(error, OperationType.UPDATE, `inventory/${item.id}`));
                     }
                   }}
                   className={cn(
@@ -1392,12 +1382,12 @@ function InventoryView({ inventory, darkMode }: { inventory: InventoryItem[], da
                 >
                   <Plus size={18} />
                 </button>
-                <button 
+                <button
                   onClick={async () => {
                     try {
                       await updateDoc(doc(db, 'inventory', item.id), { quantity: Math.max(0, item.quantity - 1) });
                     } catch (error) {
-                      handleFirestoreError(error, OperationType.UPDATE, `inventory/${item.id}`);
+                      alert(handleFirestoreError(error, OperationType.UPDATE, `inventory/${item.id}`));
                     }
                   }}
                   className={cn(
@@ -1513,13 +1503,19 @@ function InventoryView({ inventory, darkMode }: { inventory: InventoryItem[], da
               >
                 Cancel
               </button>
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-100/20 hover:bg-blue-700 transition-all"
               >
                 Save
               </button>
             </div>
+            {error && (
+              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-sm font-medium flex items-center gap-2">
+                <AlertCircle size={16} />
+                <span>{error}</span>
+              </div>
+            )}
           </form>
         </div>
       )}
@@ -1530,19 +1526,25 @@ function InventoryView({ inventory, darkMode }: { inventory: InventoryItem[], da
 function AppointmentsView({ appointments, patients, darkMode }: { appointments: Appointment[], patients: Patient[], darkMode: boolean }) {
   const [showAdd, setShowAdd] = useState(false);
   const [newAppt, setNewAppt] = useState({ patientId: '', date: '', time: '', serviceType: ServiceType.CLEANING });
+  const [error, setError] = useState('');
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
     const patient = patients.find(p => p.id === newAppt.patientId);
     try {
-      await addDoc(collection(db, 'appointments'), { 
-        ...newAppt, 
+      await addDoc(collection(db, 'appointments'), {
+        patientId: newAppt.patientId,
+        date: newAppt.date,
+        time: newAppt.time,
+        serviceType: newAppt.serviceType,
         patientName: patient?.name || 'Unknown',
-        status: 'Scheduled' 
+        status: 'Scheduled'
       });
       setShowAdd(false);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, 'appointments');
+    } catch (err) {
+      const msg = handleFirestoreError(err, OperationType.CREATE, 'appointments');
+      setError(msg);
     }
   };
 
@@ -1603,24 +1605,24 @@ function AppointmentsView({ appointments, patients, darkMode }: { appointments: 
                 </td>
                 <td className="px-4 md:px-8 py-4 md:py-5 text-right">
                   <div className="flex items-center justify-end gap-2">
-                    <button 
+                    <button
                       onClick={async () => {
                         try {
                           await updateDoc(doc(db, 'appointments', appt.id), { status: 'Completed' });
                         } catch (error) {
-                          handleFirestoreError(error, OperationType.UPDATE, `appointments/${appt.id}`);
+                          alert(handleFirestoreError(error, OperationType.UPDATE, `appointments/${appt.id}`));
                         }
                       }}
                       className={cn("p-2 rounded-lg transition-colors", darkMode ? "hover:bg-green-500/10 text-green-400" : "hover:bg-emerald-50 text-emerald-600")}
                     >
                       <CheckCircle2 size={18} />
                     </button>
-                    <button 
+                    <button
                       onClick={async () => {
                         try {
                           await deleteDoc(doc(db, 'appointments', appt.id));
                         } catch (error) {
-                          handleFirestoreError(error, OperationType.DELETE, `appointments/${appt.id}`);
+                          alert(handleFirestoreError(error, OperationType.DELETE, `appointments/${appt.id}`));
                         }
                       }}
                       className={cn("p-2 rounded-lg transition-colors", darkMode ? "hover:bg-red-500/10 text-red-400" : "hover:bg-red-50 text-red-600")}
@@ -1719,6 +1721,12 @@ function AppointmentsView({ appointments, patients, darkMode }: { appointments: 
                 Schedule
               </button>
             </div>
+            {error && (
+              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-sm font-medium flex items-center gap-2">
+                <AlertCircle size={16} />
+                <span>{error}</span>
+              </div>
+            )}
           </form>
         </div>
       )}
@@ -1773,62 +1781,71 @@ function PrescriptionsView({ patients, prescriptions, doctorProfile, user, darkM
     e.preventDefault();
     setLoading(true);
     try {
+      const doctorName = doctorProfile?.displayName || user.displayName || 'Doctor';
+      const dateStr = new Date().toISOString();
       const prescriptionData = {
-        ...formData,
-        doctorName: doctorProfile?.displayName || user.displayName || 'Doctor',
-        date: new Date().toISOString(),
+        patientId: formData.patientId,
+        patientName: formData.patientName,
+        patientEmail: formData.patientEmail,
+        medicines: formData.medicines,
+        instructions: formData.instructions,
+        doctorName,
+        date: dateStr,
       };
 
       // Save to Firestore
       await addDoc(collection(db, 'prescriptions'), prescriptionData);
 
-      // Send Email
-      const emailHtml = `
-        <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
-          <div style="background-color: #2563eb; color: white; padding: 24px; text-align: center;">
-            <h1 style="margin: 0;">KHAN DENTAL</h1>
-            <p style="margin: 4px 0 0 0; opacity: 0.8;">Medical Prescription</p>
-          </div>
-          <div style="padding: 24px;">
-            <p><strong>Patient:</strong> ${formData.patientName}</p>
-            <p><strong>Doctor:</strong> ${prescriptionData.doctorName}</p>
-            <p><strong>Date:</strong> ${formatDate(prescriptionData.date)}</p>
-            <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 24px 0;">
-            <h3 style="color: #1e293b;">Medicines:</h3>
-            <table style="width: 100%; border-collapse: collapse;">
-              <thead>
-                <tr style="background-color: #f8fafc;">
-                  <th style="padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0;">Medicine</th>
-                  <th style="padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0;">Dosage</th>
-                  <th style="padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0;">Frequency</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${formData.medicines.map(m => `
-                  <tr>
-                    <td style="padding: 12px; border-bottom: 1px solid #f1f5f9;">${m.name}</td>
-                    <td style="padding: 12px; border-bottom: 1px solid #f1f5f9;">${m.dosage}</td>
-                    <td style="padding: 12px; border-bottom: 1px solid #f1f5f9;">${m.frequency}</td>
+      // Try sending email (don't fail the whole operation if email fails)
+      try {
+        const emailHtml = `
+          <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+            <div style="background-color: #2563eb; color: white; padding: 24px; text-align: center;">
+              <h1 style="margin: 0;">KHAN DENTAL</h1>
+              <p style="margin: 4px 0 0 0; opacity: 0.8;">Medical Prescription</p>
+            </div>
+            <div style="padding: 24px;">
+              <p><strong>Patient:</strong> ${formData.patientName}</p>
+              <p><strong>Doctor:</strong> ${doctorName}</p>
+              <p><strong>Date:</strong> ${formatDate(dateStr)}</p>
+              <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 24px 0;">
+              <h3 style="color: #1e293b;">Medicines:</h3>
+              <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                  <tr style="background-color: #f8fafc;">
+                    <th style="padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0;">Medicine</th>
+                    <th style="padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0;">Dosage</th>
+                    <th style="padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0;">Frequency</th>
                   </tr>
-                `).join('')}
-              </tbody>
-            </table>
-            ${formData.instructions ? `
-              <div style="margin-top: 24px; padding: 16px; background-color: #f8fafc; border-radius: 8px;">
-                <p style="margin: 0; font-weight: bold; color: #64748b;">Instructions:</p>
-                <p style="margin: 8px 0 0 0;">${formData.instructions}</p>
-              </div>
-            ` : ''}
+                </thead>
+                <tbody>
+                  ${formData.medicines.map(m => `
+                    <tr>
+                      <td style="padding: 12px; border-bottom: 1px solid #f1f5f9;">${m.name}</td>
+                      <td style="padding: 12px; border-bottom: 1px solid #f1f5f9;">${m.dosage}</td>
+                      <td style="padding: 12px; border-bottom: 1px solid #f1f5f9;">${m.frequency}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+              ${formData.instructions ? `
+                <div style="margin-top: 24px; padding: 16px; background-color: #f8fafc; border-radius: 8px;">
+                  <p style="margin: 0; font-weight: bold; color: #64748b;">Instructions:</p>
+                  <p style="margin: 8px 0 0 0;">${formData.instructions}</p>
+                </div>
+              ` : ''}
+            </div>
+            <div style="background-color: #f8fafc; padding: 16px; text-align: center; font-size: 12px; color: #94a3b8;">
+              Thank you for choosing Khan Dental!
+            </div>
           </div>
-          <div style="background-color: #f8fafc; padding: 16px; text-align: center; font-size: 12px; color: #94a3b8;">
-            Thank you for choosing Khan Dental!
-          </div>
-        </div>
-      `;
+        `;
+        await sendEmail(formData.patientEmail, `Prescription from Khan Dental - ${formatDate(dateStr)}`, emailHtml);
+        setMessage({ type: 'success', text: 'Prescription saved and emailed successfully!' });
+      } catch {
+        setMessage({ type: 'success', text: 'Prescription saved! Email could not be sent.' });
+      }
 
-      await sendEmail(formData.patientEmail, `Prescription from Khan Dental - ${formatDate(prescriptionData.date)}`, emailHtml);
-
-      setMessage({ type: 'success', text: 'Prescription saved and emailed successfully!' });
       setShowAddModal(false);
       setFormData({
         patientId: '',
@@ -1838,7 +1855,8 @@ function PrescriptionsView({ patients, prescriptions, doctorProfile, user, darkM
         instructions: ''
       });
     } catch (error: any) {
-      setMessage({ type: 'error', text: error.message });
+      const msg = handleFirestoreError(error, OperationType.CREATE, 'prescriptions');
+      setMessage({ type: 'error', text: msg });
     } finally {
       setLoading(false);
     }
@@ -2107,21 +2125,27 @@ function ProfileView({ user, darkMode }: { user: User, darkMode: boolean }) {
     setLoading(true);
     setMessage({ type: '', text: '' });
     try {
-      // Update Auth Profile (only displayName, photoURL is too long for Auth)
+      // Update Auth Profile
       await updateProfile(user, { displayName });
-      
-      // Update Firestore Doctor Info (including photoURL)
+
+      // Update Firestore Doctor Info
       await setDoc(doc(db, 'doctors', user.uid), {
-        ...doctorInfo,
         uid: user.uid,
-        displayName, // Store displayName in Firestore too
-        photoURL,    // Store photoURL in Firestore (1MB limit)
+        specialization: doctorInfo.specialization,
+        licenseNo: doctorInfo.licenseNo,
+        clinicName: doctorInfo.clinicName,
+        phone: doctorInfo.phone,
+        bio: doctorInfo.bio,
+        address: doctorInfo.address,
+        displayName,
+        photoURL,
         updatedAt: new Date().toISOString()
       }, { merge: true });
 
-      setMessage({ type: 'success', text: 'Profile and professional info updated successfully!' });
+      setMessage({ type: 'success', text: 'Profile updated successfully!' });
     } catch (error: any) {
-      setMessage({ type: 'error', text: error.message });
+      const msg = getFirestoreErrorMessage(error);
+      setMessage({ type: 'error', text: msg });
     } finally {
       setLoading(false);
     }
