@@ -146,6 +146,35 @@ const LoginSignup = ({ darkMode }: { darkMode: boolean }) => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const getAuthErrorMessage = (errorCode: string, isLogin: boolean): string => {
+    switch (errorCode) {
+      case 'auth/invalid-credential':
+        return isLogin
+          ? 'Invalid email or password. Please check your credentials or sign up for a new account.'
+          : 'Invalid credentials. Please try again.';
+      case 'auth/user-not-found':
+        return 'No account found with this email. Please sign up first.';
+      case 'auth/wrong-password':
+        return 'Incorrect password. Please try again.';
+      case 'auth/email-already-in-use':
+        return 'An account with this email already exists. Please sign in instead.';
+      case 'auth/weak-password':
+        return 'Password should be at least 6 characters long.';
+      case 'auth/invalid-email':
+        return 'Please enter a valid email address.';
+      case 'auth/too-many-requests':
+        return 'Too many failed attempts. Please try again later.';
+      case 'auth/network-request-failed':
+        return 'Network error. Please check your internet connection.';
+      case 'auth/popup-closed-by-user':
+        return 'Sign-in popup was closed. Please try again.';
+      case 'auth/operation-not-allowed':
+        return 'This sign-in method is not enabled. Please contact the administrator.';
+      default:
+        return 'An unexpected error occurred. Please try again.';
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -157,7 +186,8 @@ const LoginSignup = ({ darkMode }: { darkMode: boolean }) => {
         await createUserWithEmailAndPassword(auth, email, password);
       }
     } catch (err: any) {
-      setError(err.message);
+      const code = err.code || '';
+      setError(getAuthErrorMessage(code, isLogin));
     } finally {
       setLoading(false);
     }
@@ -168,7 +198,8 @@ const LoginSignup = ({ darkMode }: { darkMode: boolean }) => {
     try {
       await signInWithPopup(auth, provider);
     } catch (err: any) {
-      setError(err.message);
+      const code = err.code || '';
+      setError(getAuthErrorMessage(code, false));
     }
   };
 
@@ -890,7 +921,7 @@ function AddPatientModal({ onClose, patient, darkMode }: { onClose: () => void, 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-end sm:items-center justify-center z-50 sm:p-4">
       <div className={cn(
-        "rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto transition-all duration-300",
+        "rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto! transition-all duration-300",
         darkMode ? "glass-card" : "bg-white"
       )}>
         <div className={cn(
@@ -967,8 +998,8 @@ function AddPatientModal({ onClose, patient, darkMode }: { onClose: () => void, 
                   "w-full px-4 py-3 border-none rounded-xl focus:ring-2 focus:ring-blue-100 transition-all",
                   darkMode ? "bg-white/5 text-white border border-white/10" : "bg-slate-50 text-slate-900"
                 )}
-                value={formData.amountPaid}
-                onChange={e => setFormData({...formData, amountPaid: Number(e.target.value)})}
+                value={formData.amountPaid || ''}
+                onChange={e => setFormData({...formData, amountPaid: Number(e.target.value) || 0})}
               />
             </div>
             <div className="space-y-2">
