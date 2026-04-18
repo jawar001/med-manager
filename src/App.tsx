@@ -951,9 +951,9 @@ function AppContent() {
                     </tr>
                   </thead>
                   <tbody className={cn("divide-y transition-colors", darkMode ? "divide-white/10" : "divide-slate-100")}>
-                    {filteredPatients.map((patient) => (
+                    {filteredPatients.map((patient, idx) => (
                       <tr key={patient.id} className={cn("transition-colors", darkMode ? "hover:bg-white/5" : "hover:bg-slate-50")}>
-                        <td className="px-4 md:px-6 py-3 md:py-4 font-mono text-sm text-slate-500">{patient.serialNo}</td>
+                        <td className="px-4 md:px-6 py-3 md:py-4 font-mono text-sm text-slate-500">{idx + 1}</td>
                         <td className="px-4 md:px-6 py-3 md:py-4">
                           <p className={cn("font-bold", darkMode ? "text-white" : "text-slate-900")}>{patient.name}</p>
                           <p className="text-xs text-slate-500">{formatDate(patient.createdAt)}</p>
