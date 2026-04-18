@@ -1818,19 +1818,25 @@ function InventoryView({ inventory, darkMode }: { inventory: InventoryItem[], da
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className={cn("text-sm font-bold", darkMode ? "text-slate-400" : "text-slate-700")}>Purchase Price (per unit)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="0.00"
-                    className={cn(
-                      "w-full px-4 py-3 border-none rounded-xl transition-all",
-                      darkMode ? "bg-white/5 text-white placeholder:text-slate-500 border border-white/10" : "bg-slate-50 text-slate-900"
-                    )}
-                    value={newItem.purchasePrice || ''}
-                    onChange={e => setNewItem({...newItem, purchasePrice: Number(e.target.value)})}
-                  />
+                  <label className={cn("text-sm font-bold", darkMode ? "text-slate-400" : "text-slate-700")}>Purchase Price (per unit, BDT)</label>
+                  <div className="relative">
+                    <span className={cn(
+                      "absolute left-4 top-1/2 -translate-y-1/2 text-lg font-bold pointer-events-none",
+                      darkMode ? "text-slate-400" : "text-slate-500"
+                    )}>৳</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      className={cn(
+                        "w-full pl-9 pr-4 py-3 border-none rounded-xl transition-all",
+                        darkMode ? "bg-white/5 text-white placeholder:text-slate-500 border border-white/10" : "bg-slate-50 text-slate-900"
+                      )}
+                      value={newItem.purchasePrice || ''}
+                      onChange={e => setNewItem({...newItem, purchasePrice: Number(e.target.value)})}
+                    />
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <label className={cn("text-sm font-bold", darkMode ? "text-slate-400" : "text-slate-700")}>Company / Supplier</label>
