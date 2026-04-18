@@ -647,12 +647,56 @@ function AppContent() {
     }
   };
 
+  // Reconcile: hide records that point to a patient that no longer exists.
+  // Keeps displayed aggregates (Total Revenue, etc.) consistent with the patients list
+  // even while orphan cleanup is still in flight.
+  const patientIdSet = useMemo(() => new Set(patients.map(p => p.id)), [patients]);
+
+  const reconciledTransactions = useMemo(
+    () => transactions.filter(t => !t.patientId || patientIdSet.has(t.patientId)),
+    [transactions, patientIdSet]
+  );
+
+  const reconciledAppointments = useMemo(
+    () => appointments.filter(a => !a.patientId || patientIdSet.has(a.patientId)),
+    [appointments, patientIdSet]
+  );
+
+  // Auto-clean orphaned records in Firestore (one-shot per change).
+  // Skips until initial loads land, then only runs when orphans are actually present.
+  const [initialDataLoaded, setInitialDataLoaded] = useState(false);
+  useEffect(() => {
+    if (user && patients.length >= 0 && transactions.length >= 0 && appointments.length >= 0 && !initialDataLoaded) {
+      setInitialDataLoaded(true);
+    }
+  }, [user, patients, transactions, appointments, initialDataLoaded]);
+
+  useEffect(() => {
+    if (!user || !initialDataLoaded) return;
+    const orphanTx = transactions.filter(t => t.patientId && !patientIdSet.has(t.patientId));
+    const orphanAppt = appointments.filter(a => a.patientId && !patientIdSet.has(a.patientId));
+    if (orphanTx.length === 0 && orphanAppt.length === 0) return;
+    (async () => {
+      try {
+        const batch = writeBatch(db);
+        orphanTx.forEach(t => batch.delete(doc(db, 'transactions', t.id)));
+        orphanAppt.forEach(a => batch.delete(doc(db, 'appointments', a.id)));
+        await batch.commit();
+      } catch (err) {
+        handleFirestoreError(err, OperationType.DELETE, 'orphan-cleanup');
+      }
+    })();
+  }, [user, initialDataLoaded, transactions, appointments, patientIdSet]);
+
   const stats = useMemo(() => {
-    const totalRevenue = transactions.filter(t => t.type === 'Income').reduce((sum, t) => sum + t.amount, 0);
+    const totalRevenue = reconciledTransactions
+      .filter(t => t.type === 'Income')
+      .reduce((sum, t) => sum + t.amount, 0);
     const pendingPayments = patients.reduce((sum, p) => sum + (p.amountDue - p.amountPaid), 0);
-    const todayAppointments = appointments.filter(a => a.date === new Date().toISOString().split('T')[0]).length;
+    const today = new Date().toISOString().split('T')[0];
+    const todayAppointments = reconciledAppointments.filter(a => a.date === today).length;
     return { totalRevenue, pendingPayments, todayAppointments, totalPatients: patients.length };
-  }, [transactions, patients, appointments]);
+  }, [reconciledTransactions, reconciledAppointments, patients]);
 
   if (loading) return (
     <div className="h-screen w-full flex items-center justify-center bg-slate-50">
@@ -1027,11 +1071,11 @@ function AppContent() {
             </div>
           )}
 
-          {activeTab === 'analytics' && <AnalyticsView transactions={transactions} patients={patients} darkMode={darkMode} />}
+          {activeTab === 'analytics' && <AnalyticsView transactions={reconciledTransactions} patients={patients} darkMode={darkMode} />}
           {activeTab === 'inventory' && <InventoryView inventory={inventory} darkMode={darkMode} />}
-          {activeTab === 'appointments' && <AppointmentsView appointments={appointments} patients={patients} darkMode={darkMode} dateFilter={apptDateFilter} onDateFilterChange={setApptDateFilter} />}
+          {activeTab === 'appointments' && <AppointmentsView appointments={reconciledAppointments} patients={patients} darkMode={darkMode} dateFilter={apptDateFilter} onDateFilterChange={setApptDateFilter} />}
           {activeTab === 'prescriptions' && <PrescriptionsView patients={patients} prescriptions={prescriptions} doctorProfile={doctorProfile} user={user} darkMode={darkMode} />}
-          {activeTab === 'sheets' && <SheetsView transactions={transactions} darkMode={darkMode} />}
+          {activeTab === 'sheets' && <SheetsView transactions={reconciledTransactions} darkMode={darkMode} />}
           {activeTab === 'profile' && <ProfileView user={user} darkMode={darkMode} />}
         </div>
       </main>
