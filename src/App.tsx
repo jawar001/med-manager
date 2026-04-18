@@ -39,7 +39,9 @@ import {
   ClipboardList,
   PlusCircle,
   Mail,
-  Printer
+  Printer,
+  Inbox,
+  ShieldAlert
 } from 'lucide-react';
 import {
   collection,
@@ -49,14 +51,17 @@ import {
   deleteDoc,
   doc,
   query,
+  where,
   orderBy,
   setDoc,
-  getDoc
+  getDoc,
+  getDocs,
+  writeBatch
 } from 'firebase/firestore';
-import { 
-  signInWithPopup, 
-  GoogleAuthProvider, 
-  onAuthStateChanged, 
+import {
+  signInWithPopup,
+  GoogleAuthProvider,
+  onAuthStateChanged,
   signOut,
   User,
   createUserWithEmailAndPassword,
@@ -65,7 +70,9 @@ import {
   updatePassword,
   deleteUser,
   EmailAuthProvider,
-  reauthenticateWithCredential
+  reauthenticateWithCredential,
+  sendEmailVerification,
+  sendPasswordResetEmail
 } from 'firebase/auth';
 import { db, auth } from './firebase';
 import { 
@@ -142,9 +149,12 @@ const LoginSignup = ({ darkMode }: { darkMode: boolean }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
   const [loading, setLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
 
   const getAuthErrorMessage = (errorCode: string, isLogin: boolean): string => {
     switch (errorCode) {
@@ -178,12 +188,28 @@ const LoginSignup = ({ darkMode }: { darkMode: boolean }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setInfo('');
+    if (!isLogin) {
+      if (password.length < 6) {
+        setError('Password should be at least 6 characters long.');
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError('Passwords do not match.');
+        return;
+      }
+    }
     setLoading(true);
     try {
       if (isLogin) {
         await signInWithEmailAndPassword(auth, email, password);
       } else {
-        await createUserWithEmailAndPassword(auth, email, password);
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        try {
+          await sendEmailVerification(cred.user);
+        } catch {
+          // non-fatal
+        }
       }
     } catch (err: any) {
       const code = err.code || '';
@@ -200,6 +226,24 @@ const LoginSignup = ({ darkMode }: { darkMode: boolean }) => {
     } catch (err: any) {
       const code = err.code || '';
       setError(getAuthErrorMessage(code, false));
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    setError('');
+    setInfo('');
+    if (!email) {
+      setError('Please enter your email address first, then click "Forgot password?".');
+      return;
+    }
+    setResetLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setInfo(`Password reset email sent to ${email}. Check your inbox.`);
+    } catch (err: any) {
+      setError(getAuthErrorMessage(err.code || '', true));
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -231,6 +275,13 @@ const LoginSignup = ({ darkMode }: { darkMode: boolean }) => {
           </div>
         )}
 
+        {info && (
+          <div className="mb-6 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-sm font-medium flex items-center gap-3">
+            <CheckCircle2 size={18} />
+            <span className="flex-1">{info}</span>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className={cn("block text-xs font-bold uppercase tracking-widest mb-2 ml-1", darkMode ? "text-slate-500" : "text-slate-400")}>
@@ -252,9 +303,21 @@ const LoginSignup = ({ darkMode }: { darkMode: boolean }) => {
           </div>
 
           <div>
-            <label className={cn("block text-xs font-bold uppercase tracking-widest mb-2 ml-1", darkMode ? "text-slate-500" : "text-slate-400")}>
-              Password
-            </label>
+            <div className="flex items-center justify-between mb-2 ml-1">
+              <label className={cn("block text-xs font-bold uppercase tracking-widest", darkMode ? "text-slate-500" : "text-slate-400")}>
+                Password
+              </label>
+              {isLogin && (
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  disabled={resetLoading}
+                  className="text-xs font-bold text-blue-500 hover:text-blue-600 transition-colors disabled:opacity-50"
+                >
+                  {resetLoading ? "Sending..." : "Forgot password?"}
+                </button>
+              )}
+            </div>
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
@@ -263,8 +326,8 @@ const LoginSignup = ({ darkMode }: { darkMode: boolean }) => {
                 onChange={(e) => setPassword(e.target.value)}
                 className={cn(
                   "w-full px-5 py-4 rounded-2xl border outline-none transition-all font-medium pr-12",
-                  darkMode 
-                    ? "bg-slate-800/50 border-slate-700 text-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10" 
+                  darkMode
+                    ? "bg-slate-800/50 border-slate-700 text-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
                     : "bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
                 )}
                 placeholder="••••••••"
@@ -280,7 +343,33 @@ const LoginSignup = ({ darkMode }: { darkMode: boolean }) => {
                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
             </div>
+            {!isLogin && (
+              <p className={cn("mt-2 ml-1 text-xs font-medium", darkMode ? "text-slate-500" : "text-slate-400")}>
+                Use at least 6 characters.
+              </p>
+            )}
           </div>
+
+          {!isLogin && (
+            <div>
+              <label className={cn("block text-xs font-bold uppercase tracking-widest mb-2 ml-1", darkMode ? "text-slate-500" : "text-slate-400")}>
+                Confirm Password
+              </label>
+              <input
+                type={showPassword ? "text" : "password"}
+                required
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className={cn(
+                  "w-full px-5 py-4 rounded-2xl border outline-none transition-all font-medium",
+                  darkMode
+                    ? "bg-slate-800/50 border-slate-700 text-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                    : "bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                )}
+                placeholder="Re-enter password"
+              />
+            </div>
+          )}
 
           <button
             type="submit"
@@ -318,7 +407,7 @@ const LoginSignup = ({ darkMode }: { darkMode: boolean }) => {
         <p className={cn("text-center mt-8 text-sm font-medium", darkMode ? "text-slate-400" : "text-slate-500")}>
           {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
           <button
-            onClick={() => setIsLogin(!isLogin)}
+            onClick={() => { setIsLogin(!isLogin); setError(''); setInfo(''); setConfirmPassword(''); }}
             className="text-blue-500 font-bold hover:underline"
           >
             {isLogin ? "Sign Up" : "Sign In"}
@@ -354,9 +443,28 @@ const SidebarItem: React.FC<{ icon: any, label: string, active: boolean, onClick
   </button>
 );
 
-const StatCard = ({ label, value, icon: Icon, color, darkMode, glowClass }: { label: string, value: string | number, icon: any, color: string, darkMode: boolean, glowClass?: string }) => (
+const EmptyState = ({ message = "There is no data available", darkMode, icon: Icon = Inbox }: { message?: string, darkMode: boolean, icon?: any }) => (
   <div className={cn(
-    "p-4 md:p-6 rounded-2xl md:rounded-3xl border transition-all duration-500 group relative overflow-hidden",
+    "w-full flex flex-col items-center justify-center py-16 px-6 text-center",
+    darkMode ? "text-slate-400" : "text-slate-500"
+  )}>
+    <div className={cn(
+      "w-16 h-16 rounded-2xl flex items-center justify-center mb-4",
+      darkMode ? "bg-white/5 border border-white/10" : "bg-slate-100"
+    )}>
+      <Icon size={28} />
+    </div>
+    <p className="font-bold text-base">{message}</p>
+    <p className={cn("text-sm mt-1", darkMode ? "text-slate-500" : "text-slate-400")}>Records you add will appear here.</p>
+  </div>
+);
+
+const StatCard = ({ label, value, icon: Icon, color, darkMode, glowClass, onClick }: { label: string, value: string | number, icon: any, color: string, darkMode: boolean, glowClass?: string, onClick?: () => void }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={cn(
+    "p-4 md:p-6 rounded-2xl md:rounded-3xl border transition-all duration-500 group relative overflow-hidden text-left w-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/40",
     darkMode
       ? "glass-card glass-card-glow hover:scale-[1.02] " + glowClass
       : "bg-white border-slate-100 shadow-sm hover:shadow-md"
@@ -399,7 +507,7 @@ const StatCard = ({ label, value, icon: Icon, color, darkMode, glowClass }: { la
         <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">Live Tracking</span>
       </div>
     )}
-  </div>
+  </button>
 );
 
 // --- Main App ---
@@ -436,6 +544,8 @@ function AppContent() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
+  const [patientFilter, setPatientFilter] = useState<'all' | 'unpaid'>('all');
+  const [apptDateFilter, setApptDateFilter] = useState<string>('');
 
   // Theme Effect
   useEffect(() => {
@@ -511,12 +621,31 @@ function AppContent() {
   const handleLogout = () => signOut(auth);
 
   const filteredPatients = useMemo(() => {
-    return patients.filter(p => 
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.serialNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.serviceType.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [patients, searchQuery]);
+    return patients.filter(p => {
+      const matchesSearch =
+        p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.serialNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.serviceType.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesFilter = patientFilter === 'all' ? true : (p.amountDue - p.amountPaid) > 0;
+      return matchesSearch && matchesFilter;
+    });
+  }, [patients, searchQuery, patientFilter]);
+
+  const deletePatientWithRelated = async (patientId: string) => {
+    await deleteDoc(doc(db, 'patients', patientId));
+    const relatedQueries = [
+      query(collection(db, 'transactions'), where('patientId', '==', patientId)),
+      query(collection(db, 'appointments'), where('patientId', '==', patientId)),
+      query(collection(db, 'prescriptions'), where('patientId', '==', patientId)),
+    ];
+    for (const q of relatedQueries) {
+      const snap = await getDocs(q);
+      if (snap.empty) continue;
+      const batch = writeBatch(db);
+      snap.docs.forEach(d => batch.delete(d.ref));
+      await batch.commit();
+    }
+  };
 
   const stats = useMemo(() => {
     const totalRevenue = transactions.filter(t => t.type === 'Income').reduce((sum, t) => sum + t.amount, 0);
@@ -679,16 +808,92 @@ function AppContent() {
               </div>
 
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
-                <StatCard label="Today's Appointments" value={stats.todayAppointments} icon={Calendar} color="bg-blue-500" darkMode={darkMode} glowClass="glow-blue" />
-                <StatCard label="Total Revenue" value={formatCurrency(stats.totalRevenue)} icon={Banknote} color="bg-teal-500" darkMode={darkMode} glowClass="glow-teal" />
-                <StatCard label="Pending Payments" value={formatCurrency(stats.pendingPayments)} icon={AlertCircle} color="bg-red-500" darkMode={darkMode} glowClass="glow-red" />
-                <StatCard label="Active Patients" value={stats.totalPatients} icon={Users} color="bg-green-500" darkMode={darkMode} glowClass="glow-green" />
+                <StatCard
+                  label="Today's Appointments"
+                  value={stats.todayAppointments}
+                  icon={Calendar}
+                  color="bg-blue-500"
+                  darkMode={darkMode}
+                  glowClass="glow-blue"
+                  onClick={() => {
+                    setApptDateFilter(new Date().toISOString().split('T')[0]);
+                    setActiveTab('appointments');
+                  }}
+                />
+                <StatCard
+                  label="Total Revenue"
+                  value={formatCurrency(stats.totalRevenue)}
+                  icon={Banknote}
+                  color="bg-teal-500"
+                  darkMode={darkMode}
+                  glowClass="glow-teal"
+                  onClick={() => setActiveTab('analytics')}
+                />
+                <StatCard
+                  label="Pending Payments"
+                  value={formatCurrency(stats.pendingPayments)}
+                  icon={AlertCircle}
+                  color="bg-red-500"
+                  darkMode={darkMode}
+                  glowClass="glow-red"
+                  onClick={() => {
+                    setPatientFilter('unpaid');
+                    setActiveTab('dashboard');
+                  }}
+                />
+                <StatCard
+                  label="Active Patients"
+                  value={stats.totalPatients}
+                  icon={Users}
+                  color="bg-green-500"
+                  darkMode={darkMode}
+                  glowClass="glow-green"
+                  onClick={() => {
+                    setPatientFilter('all');
+                    setActiveTab('dashboard');
+                  }}
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={cn("text-xs font-bold uppercase tracking-wider", darkMode ? "text-slate-400" : "text-slate-500")}>Filter:</span>
+                <button
+                  onClick={() => setPatientFilter('all')}
+                  className={cn(
+                    "px-3 py-1.5 rounded-full text-xs font-bold transition-all",
+                    patientFilter === 'all'
+                      ? "bg-blue-600 text-white shadow-md shadow-blue-200"
+                      : darkMode ? "bg-white/5 text-slate-300 hover:bg-white/10" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  )}
+                >All Patients</button>
+                <button
+                  onClick={() => setPatientFilter('unpaid')}
+                  className={cn(
+                    "px-3 py-1.5 rounded-full text-xs font-bold transition-all",
+                    patientFilter === 'unpaid'
+                      ? "bg-red-600 text-white shadow-md shadow-red-200"
+                      : darkMode ? "bg-white/5 text-slate-300 hover:bg-white/10" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  )}
+                >Pending Payments</button>
               </div>
 
               <div className={cn(
                 "rounded-2xl border shadow-sm overflow-hidden transition-all duration-300",
                 darkMode ? "glass-card" : "bg-white border-slate-100"
               )}>
+                {filteredPatients.length === 0 ? (
+                  <EmptyState
+                    darkMode={darkMode}
+                    icon={Users}
+                    message={
+                      patients.length === 0
+                        ? "There is no data available"
+                        : patientFilter === 'unpaid'
+                          ? "No patients with pending payments"
+                          : "No patients match your search"
+                    }
+                  />
+                ) : (
                 <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse min-w-[700px]">
                   <thead>
@@ -797,9 +1002,9 @@ function AppContent() {
                             </button>
                             <button
                               onClick={async () => {
-                                if (confirm("Are you sure you want to delete this patient?")) {
+                                if (confirm("Are you sure you want to delete this patient? This will also remove their transactions, appointments, and prescriptions.")) {
                                   try {
-                                    await deleteDoc(doc(db, 'patients', patient.id));
+                                    await deletePatientWithRelated(patient.id);
                                   } catch (error) {
                                     const msg = handleFirestoreError(error, OperationType.DELETE, `patients/${patient.id}`);
                                     alert(msg);
@@ -817,13 +1022,14 @@ function AppContent() {
                   </tbody>
                 </table>
                 </div>
+                )}
               </div>
             </div>
           )}
 
           {activeTab === 'analytics' && <AnalyticsView transactions={transactions} patients={patients} darkMode={darkMode} />}
           {activeTab === 'inventory' && <InventoryView inventory={inventory} darkMode={darkMode} />}
-          {activeTab === 'appointments' && <AppointmentsView appointments={appointments} patients={patients} darkMode={darkMode} />}
+          {activeTab === 'appointments' && <AppointmentsView appointments={appointments} patients={patients} darkMode={darkMode} dateFilter={apptDateFilter} onDateFilterChange={setApptDateFilter} />}
           {activeTab === 'prescriptions' && <PrescriptionsView patients={patients} prescriptions={prescriptions} doctorProfile={doctorProfile} user={user} darkMode={darkMode} />}
           {activeTab === 'sheets' && <SheetsView transactions={transactions} darkMode={darkMode} />}
           {activeTab === 'profile' && <ProfileView user={user} darkMode={darkMode} />}
@@ -1198,6 +1404,8 @@ function AnalyticsView({ transactions, patients, darkMode }: { transactions: Tra
     }
   };
 
+  const hasData = transactions.length > 0 || patients.length > 0;
+
   return (
     <div className="space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div>
@@ -1205,6 +1413,14 @@ function AnalyticsView({ transactions, patients, darkMode }: { transactions: Tra
         <p className={cn("mt-1 font-medium text-sm md:text-base", darkMode ? "text-slate-400" : "text-slate-500")}>Financial performance and service trends</p>
       </div>
 
+      {!hasData ? (
+        <div className={cn(
+          "rounded-2xl md:rounded-3xl border overflow-hidden",
+          darkMode ? "glass-card border-white/10" : "bg-white border-slate-100 shadow-sm"
+        )}>
+          <EmptyState darkMode={darkMode} icon={BarChart3} />
+        </div>
+      ) : (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-8">
         <div className={cn(
           "p-4 md:p-8 rounded-2xl md:rounded-3xl border transition-all shadow-xl",
@@ -1266,6 +1482,7 @@ function AnalyticsView({ transactions, patients, darkMode }: { transactions: Tra
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }
@@ -1356,6 +1573,14 @@ function InventoryView({ inventory, darkMode }: { inventory: InventoryItem[], da
         </button>
       </div>
 
+      {inventory.length === 0 ? (
+        <div className={cn(
+          "rounded-2xl md:rounded-3xl border overflow-hidden",
+          darkMode ? "glass-card border-white/10" : "bg-white border-slate-100 shadow-sm"
+        )}>
+          <EmptyState darkMode={darkMode} icon={Package} />
+        </div>
+      ) : (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {inventory.map(item => (
           <div key={item.id} className={cn(
@@ -1433,6 +1658,7 @@ function InventoryView({ inventory, darkMode }: { inventory: InventoryItem[], da
           </div>
         ))}
       </div>
+      )}
 
       {showAdd && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
@@ -1554,10 +1780,15 @@ function InventoryView({ inventory, darkMode }: { inventory: InventoryItem[], da
   );
 }
 
-function AppointmentsView({ appointments, patients, darkMode }: { appointments: Appointment[], patients: Patient[], darkMode: boolean }) {
+function AppointmentsView({ appointments, patients, darkMode, dateFilter, onDateFilterChange }: { appointments: Appointment[], patients: Patient[], darkMode: boolean, dateFilter: string, onDateFilterChange: (d: string) => void }) {
   const [showAdd, setShowAdd] = useState(false);
   const [newAppt, setNewAppt] = useState({ patientId: '', date: '', time: '', serviceType: ServiceType.CLEANING });
   const [error, setError] = useState('');
+
+  const visibleAppointments = useMemo(() => {
+    if (!dateFilter) return appointments;
+    return appointments.filter(a => a.date === dateFilter);
+  }, [appointments, dateFilter]);
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1594,10 +1825,45 @@ function AppointmentsView({ appointments, patients, darkMode }: { appointments: 
         </button>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={cn("text-xs font-bold uppercase tracking-wider", darkMode ? "text-slate-400" : "text-slate-500")}>Filter by date:</span>
+        <input
+          type="date"
+          value={dateFilter}
+          onChange={(e) => onDateFilterChange(e.target.value)}
+          className={cn(
+            "px-3 py-1.5 rounded-xl text-sm font-medium border outline-none transition-all",
+            darkMode ? "bg-white/5 text-white border-white/10" : "bg-white text-slate-900 border-slate-200"
+          )}
+        />
+        {dateFilter && (
+          <button
+            onClick={() => onDateFilterChange('')}
+            className={cn(
+              "px-3 py-1.5 rounded-full text-xs font-bold transition-all",
+              darkMode ? "bg-white/5 text-slate-300 hover:bg-white/10" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            )}
+          >Clear</button>
+        )}
+      </div>
+
       <div className={cn(
         "rounded-2xl md:rounded-3xl shadow-xl overflow-hidden border transition-all",
         darkMode ? "glass-card border-white/10" : "bg-white border-slate-100 shadow-sm"
       )}>
+        {visibleAppointments.length === 0 ? (
+          <EmptyState
+            darkMode={darkMode}
+            icon={Calendar}
+            message={
+              appointments.length === 0
+                ? "There is no data available"
+                : dateFilter
+                  ? `No appointments scheduled for ${formatDate(dateFilter)}`
+                  : "No appointments match your filter"
+            }
+          />
+        ) : (
         <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse min-w-[600px]">
           <thead>
@@ -1613,7 +1879,7 @@ function AppointmentsView({ appointments, patients, darkMode }: { appointments: 
             </tr>
           </thead>
           <tbody className={cn("divide-y transition-colors", darkMode ? "divide-white/10" : "divide-slate-100")}>
-            {appointments.map(appt => (
+            {visibleAppointments.map(appt => (
               <tr key={appt.id} className={cn("group transition-colors", darkMode ? "hover:bg-white/5" : "hover:bg-slate-50/50")}>
                 <td className="px-4 md:px-8 py-4 md:py-5">
                   <p className={cn("font-bold", darkMode ? "text-white" : "text-slate-900")}>{formatDate(appt.date)}</p>
@@ -1667,6 +1933,7 @@ function AppointmentsView({ appointments, patients, darkMode }: { appointments: 
           </tbody>
         </table>
         </div>
+        )}
       </div>
 
       {showAdd && (
@@ -1919,6 +2186,14 @@ function PrescriptionsView({ patients, prescriptions, doctorProfile, user, darkM
         </div>
       )}
 
+      {prescriptions.length === 0 ? (
+        <div className={cn(
+          "rounded-2xl md:rounded-3xl border overflow-hidden",
+          darkMode ? "glass-card border-white/10" : "bg-white border-slate-100 shadow-sm"
+        )}>
+          <EmptyState darkMode={darkMode} icon={ClipboardList} />
+        </div>
+      ) : (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {prescriptions.map((p) => (
           <div key={p.id} className={cn(
@@ -1967,6 +2242,7 @@ function PrescriptionsView({ patients, prescriptions, doctorProfile, user, darkM
           </div>
         ))}
       </div>
+      )}
 
       {showAddModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-end sm:items-center justify-center z-50 sm:p-4">
@@ -2182,13 +2458,44 @@ function ProfileView({ user, darkMode }: { user: User, darkMode: boolean }) {
     }
   };
 
+  const deleteCollectionWhere = async (name: string, field: string, value: string) => {
+    const snap = await getDocs(query(collection(db, name), where(field, '==', value)));
+    if (snap.empty) return;
+    const batch = writeBatch(db);
+    snap.docs.forEach(d => batch.delete(d.ref));
+    await batch.commit();
+  };
+
+  const purgeAccountData = async () => {
+    await Promise.all([
+      deleteCollectionWhere('patients', 'ownerId', user.uid).catch(() => {}),
+      deleteCollectionWhere('transactions', 'ownerId', user.uid).catch(() => {}),
+      deleteCollectionWhere('appointments', 'ownerId', user.uid).catch(() => {}),
+      deleteCollectionWhere('prescriptions', 'ownerId', user.uid).catch(() => {}),
+      deleteCollectionWhere('inventory', 'ownerId', user.uid).catch(() => {}),
+    ]);
+    await deleteDoc(doc(db, 'doctors', user.uid)).catch(() => {});
+  };
+
+  const handleSendVerification = async () => {
+    setLoading(true);
+    try {
+      await sendEmailVerification(user);
+      setMessage({ type: 'success', text: `Verification email sent to ${user.email}.` });
+    } catch (error: any) {
+      setMessage({ type: 'error', text: error.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleReauth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
       const credential = EmailAuthProvider.credential(user.email!, currentPassword);
       await reauthenticateWithCredential(user, credential);
-      
+
       if (reauthAction === 'password') {
         await updatePassword(user, newPassword);
         setMessage({ type: 'success', text: 'Password changed successfully!' });
@@ -2196,6 +2503,7 @@ function ProfileView({ user, darkMode }: { user: User, darkMode: boolean }) {
         setConfirmPassword('');
       } else if (reauthAction === 'delete') {
         if (confirm("Are you absolutely sure? This will permanently delete your account and all associated data.")) {
+          await purgeAccountData();
           await deleteUser(user);
         }
       }
@@ -2231,9 +2539,27 @@ function ProfileView({ user, darkMode }: { user: User, darkMode: boolean }) {
           <h2 className={cn("text-2xl md:text-4xl font-black tracking-tight", darkMode ? "text-white" : "text-slate-900")}>Doctor Profile</h2>
           <p className={cn("mt-1 font-medium text-sm md:text-lg", darkMode ? "text-slate-400" : "text-slate-500")}>Manage your professional identity and account security</p>
         </div>
-        <div className="flex items-center gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-500 font-bold text-xs md:text-sm self-start sm:self-auto">
-          <BadgeCheck size={16} />
-          Verified Professional
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          <div className="flex items-center gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-500 font-bold text-xs md:text-sm">
+            <BadgeCheck size={16} />
+            Verified Professional
+          </div>
+          {user.emailVerified ? (
+            <div className="flex items-center gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 font-bold text-xs md:text-sm">
+              <CheckCircle2 size={16} />
+              Email Verified
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={handleSendVerification}
+              disabled={loading}
+              className="flex items-center gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 font-bold text-xs md:text-sm hover:bg-amber-500/20 transition-colors disabled:opacity-50"
+            >
+              <ShieldAlert size={16} />
+              {loading ? "Sending..." : "Verify Email"}
+            </button>
+          )}
         </div>
       </div>
 
@@ -2714,7 +3040,15 @@ function SheetsView({ transactions, darkMode }: { transactions: Transaction[], d
             </tr>
           </thead>
           <tbody className={cn("divide-y transition-colors", darkMode ? "divide-white/10" : "divide-slate-100")}>
-            {filteredTransactions.map(t => (
+            {filteredTransactions.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="px-4 md:px-8 py-12">
+                  <div className={cn("text-center font-medium", darkMode ? "text-slate-400" : "text-slate-500")}>
+                    {transactions.length === 0 ? "There is no data available" : "No transactions for this month"}
+                  </div>
+                </td>
+              </tr>
+            ) : filteredTransactions.map(t => (
               <tr key={t.id} className={cn("group transition-colors", darkMode ? "hover:bg-white/5" : "hover:bg-slate-50/50")}>
                 <td className="px-4 md:px-8 py-4 md:py-5">
                   <div className={cn("font-bold whitespace-nowrap", darkMode ? "text-white" : "text-slate-900")}>{formatDate(t.date)}</div>
