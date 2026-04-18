@@ -68,6 +68,8 @@ export interface InventoryItem {
   unit: string;
   minThreshold: number;
   lastRestocked: string;
+  purchasePrice?: number;
+  company?: string;
 }
 
 export interface Transaction {

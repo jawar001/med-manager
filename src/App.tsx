@@ -1533,7 +1533,7 @@ function AnalyticsView({ transactions, patients, darkMode }: { transactions: Tra
 
 function InventoryView({ inventory, darkMode }: { inventory: InventoryItem[], darkMode: boolean }) {
   const [showAdd, setShowAdd] = useState(false);
-  const [newItem, setNewItem] = useState({ name: '', category: 'PPE & Disposables', medicineType: '', quantity: 0, unit: 'pcs', minThreshold: 5 });
+  const [newItem, setNewItem] = useState({ name: '', category: 'PPE & Disposables', medicineType: '', quantity: 0, unit: 'pcs', minThreshold: 5, purchasePrice: 0, company: '' });
   const [error, setError] = useState('');
 
   const INVENTORY_CATEGORIES = [
@@ -1592,10 +1592,26 @@ function InventoryView({ inventory, darkMode }: { inventory: InventoryItem[], da
         quantity: newItem.quantity,
         unit: newItem.unit,
         minThreshold: newItem.minThreshold,
+        purchasePrice: newItem.purchasePrice,
+        company: newItem.company,
         lastRestocked: new Date().toISOString()
       });
+
+      const totalCost = (newItem.purchasePrice || 0) * (newItem.quantity || 0);
+      if (totalCost > 0) {
+        await addDoc(collection(db, 'transactions'), {
+          patientId: '',
+          patientName: newItem.company || 'Inventory',
+          amount: totalCost,
+          type: 'Expense',
+          category: 'Inventory Purchase',
+          date: new Date().toISOString().split('T')[0],
+          description: `Purchased ${newItem.quantity} ${newItem.unit} of ${newItem.name}${newItem.company ? ` from ${newItem.company}` : ''}`
+        });
+      }
+
       setShowAdd(false);
-      setNewItem({ name: '', category: 'PPE & Disposables', medicineType: '', quantity: 0, unit: 'pcs', minThreshold: 5 });
+      setNewItem({ name: '', category: 'PPE & Disposables', medicineType: '', quantity: 0, unit: 'pcs', minThreshold: 5, purchasePrice: 0, company: '' });
     } catch (err) {
       const msg = handleFirestoreError(err, OperationType.CREATE, 'inventory');
       setError(msg);
@@ -1647,6 +1663,9 @@ function InventoryView({ inventory, darkMode }: { inventory: InventoryItem[], da
                   )}
                 </div>
                 <p className={cn("text-xs font-medium", darkMode ? "text-slate-500" : "text-slate-400")}>Last restocked: {formatDate(item.lastRestocked)}</p>
+                {item.company && (
+                  <p className={cn("text-xs font-bold mt-1", darkMode ? "text-slate-300" : "text-slate-600")}>Supplier: {item.company}</p>
+                )}
               </div>
               <div className={cn(
                 "p-3 rounded-2xl transition-colors",
@@ -1660,6 +1679,11 @@ function InventoryView({ inventory, darkMode }: { inventory: InventoryItem[], da
                 <p className={cn("text-3xl font-black", darkMode ? "text-white" : "text-slate-900")}>
                   {item.quantity} <span className={cn("text-sm font-medium", darkMode ? "text-slate-500" : "text-slate-400")}>{item.unit}</span>
                 </p>
+                {typeof item.purchasePrice === 'number' && item.purchasePrice > 0 && (
+                  <p className={cn("text-xs font-medium mt-1", darkMode ? "text-slate-400" : "text-slate-500")}>
+                    {formatCurrency(item.purchasePrice)} / {item.unit}
+                  </p>
+                )}
                 {item.quantity <= item.minThreshold && (
                   <p className="text-orange-500 text-xs font-bold mt-2 flex items-center gap-1.5 animate-pulse">
                     <AlertCircle size={14} /> Low Stock
@@ -1779,24 +1803,63 @@ function InventoryView({ inventory, darkMode }: { inventory: InventoryItem[], da
                 </div>
                 <div className="space-y-2">
                   <label className={cn("text-sm font-bold", darkMode ? "text-slate-400" : "text-slate-700")}>Unit</label>
-                  <select 
-                    required 
+                  <select
+                    required
                     className={cn(
                       "w-full px-4 py-3 border-none rounded-xl transition-all",
                       darkMode ? "bg-white/5 text-white border border-white/10 [&>option]:bg-slate-900" : "bg-slate-50 text-slate-900"
                     )}
-                    value={newItem.unit} 
+                    value={newItem.unit}
                     onChange={e => setNewItem({...newItem, unit: e.target.value})}
                   >
                     {INVENTORY_UNITS.map(unit => <option key={unit} value={unit}>{unit}</option>)}
                   </select>
                 </div>
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className={cn("text-sm font-bold", darkMode ? "text-slate-400" : "text-slate-700")}>Purchase Price (per unit)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                    className={cn(
+                      "w-full px-4 py-3 border-none rounded-xl transition-all",
+                      darkMode ? "bg-white/5 text-white placeholder:text-slate-500 border border-white/10" : "bg-slate-50 text-slate-900"
+                    )}
+                    value={newItem.purchasePrice || ''}
+                    onChange={e => setNewItem({...newItem, purchasePrice: Number(e.target.value)})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className={cn("text-sm font-bold", darkMode ? "text-slate-400" : "text-slate-700")}>Company / Supplier</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 3M, Dentsply"
+                    className={cn(
+                      "w-full px-4 py-3 border-none rounded-xl transition-all",
+                      darkMode ? "bg-white/5 text-white placeholder:text-slate-500 border border-white/10" : "bg-slate-50 text-slate-900"
+                    )}
+                    value={newItem.company}
+                    onChange={e => setNewItem({...newItem, company: e.target.value})}
+                  />
+                </div>
+              </div>
+              {newItem.purchasePrice > 0 && newItem.quantity > 0 && (
+                <div className={cn(
+                  "p-3 rounded-xl text-sm font-medium flex items-center justify-between",
+                  darkMode ? "bg-white/5 text-slate-300 border border-white/10" : "bg-slate-50 text-slate-700"
+                )}>
+                  <span>Total purchase cost:</span>
+                  <span className="font-black">{formatCurrency(newItem.purchasePrice * newItem.quantity)}</span>
+                </div>
+              )}
             </div>
             <div className="flex gap-4">
-              <button 
-                type="button" 
-                onClick={() => setShowAdd(false)} 
+              <button
+                type="button"
+                onClick={() => setShowAdd(false)}
                 className={cn(
                   "flex-1 py-3 border rounded-xl font-bold transition-all",
                   darkMode ? "border-white/10 text-slate-400 hover:bg-white/5" : "border-slate-200 text-slate-600 hover:bg-slate-50"
