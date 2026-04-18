@@ -81,4 +81,5 @@ export interface Transaction {
   category: string;
   date: string;
   description: string;
+  inventoryItemId?: string;
 }

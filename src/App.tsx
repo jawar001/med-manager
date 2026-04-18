@@ -1535,6 +1535,10 @@ function InventoryView({ inventory, darkMode }: { inventory: InventoryItem[], da
   const [showAdd, setShowAdd] = useState(false);
   const [newItem, setNewItem] = useState({ name: '', category: 'PPE & Disposables', medicineType: '', quantity: 0, unit: 'pcs', minThreshold: 5, purchasePrice: 0, company: '' });
   const [error, setError] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<InventoryItem | null>(null);
+  const [reduceAmount, setReduceAmount] = useState(1);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   const INVENTORY_CATEGORIES = [
     "Medicine",
@@ -1585,7 +1589,7 @@ function InventoryView({ inventory, darkMode }: { inventory: InventoryItem[], da
     e.preventDefault();
     setError('');
     try {
-      await addDoc(collection(db, 'inventory'), {
+      const inventoryRef = await addDoc(collection(db, 'inventory'), {
         name: newItem.name,
         category: newItem.category,
         medicineType: newItem.category === 'Medicine' ? newItem.medicineType : '',
@@ -1606,7 +1610,8 @@ function InventoryView({ inventory, darkMode }: { inventory: InventoryItem[], da
           type: 'Expense',
           category: 'Inventory Purchase',
           date: new Date().toISOString().split('T')[0],
-          description: `Purchased ${newItem.quantity} ${newItem.unit} of ${newItem.name}${newItem.company ? ` from ${newItem.company}` : ''}`
+          description: `Purchased ${newItem.quantity} ${newItem.unit} of ${newItem.name}${newItem.company ? ` from ${newItem.company}` : ''}`,
+          inventoryItemId: inventoryRef.id
         });
       }
 
@@ -1707,16 +1712,14 @@ function InventoryView({ inventory, darkMode }: { inventory: InventoryItem[], da
                   <Plus size={18} />
                 </button>
                 <button
-                  onClick={async () => {
-                    try {
-                      await updateDoc(doc(db, 'inventory', item.id), { quantity: Math.max(0, item.quantity - 1) });
-                    } catch (error) {
-                      alert(handleFirestoreError(error, OperationType.UPDATE, `inventory/${item.id}`));
-                    }
+                  onClick={() => {
+                    setDeleteError('');
+                    setReduceAmount(1);
+                    setDeleteTarget(item);
                   }}
                   className={cn(
                     "p-2.5 rounded-xl transition-all",
-                    darkMode ? "bg-white/5 text-slate-400 hover:bg-red-500/20 hover:text-red-400" : "bg-slate-50 text-slate-600 hover:bg-slate-100"
+                    darkMode ? "bg-white/5 text-slate-400 hover:bg-red-500/20 hover:text-red-400" : "bg-slate-50 text-slate-600 hover:bg-red-50 hover:text-red-500"
                   )}
                 >
                   <Trash2 size={18} />
@@ -1887,6 +1890,138 @@ function InventoryView({ inventory, darkMode }: { inventory: InventoryItem[], da
               </div>
             )}
           </form>
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className={cn(
+            "rounded-3xl p-6 md:p-8 max-w-md w-full space-y-6 shadow-2xl",
+            darkMode ? "glass-card" : "bg-white"
+          )}>
+            <div>
+              <h2 className={cn("text-2xl font-bold", darkMode ? "text-white" : "text-slate-900")}>Remove Stock</h2>
+              <p className={cn("text-sm font-medium mt-1", darkMode ? "text-slate-400" : "text-slate-500")}>
+                "{deleteTarget.name}" — {deleteTarget.quantity} {deleteTarget.unit} in stock
+              </p>
+            </div>
+
+            <div className={cn(
+              "p-4 rounded-2xl border space-y-3",
+              darkMode ? "bg-white/5 border-white/10" : "bg-slate-50 border-slate-100"
+            )}>
+              <div className="flex items-start gap-3">
+                <div className={cn(
+                  "p-2 rounded-xl shrink-0",
+                  darkMode ? "bg-accent-teal/10 text-accent-teal" : "bg-blue-50 text-blue-600"
+                )}>
+                  <Package size={18} />
+                </div>
+                <div className="flex-1">
+                  <p className={cn("font-bold text-sm", darkMode ? "text-white" : "text-slate-900")}>Reduce Stock Quantity</p>
+                  <p className={cn("text-xs font-medium mt-0.5", darkMode ? "text-slate-400" : "text-slate-500")}>Deduct a specific amount from existing stock.</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  min={1}
+                  max={deleteTarget.quantity}
+                  value={reduceAmount}
+                  onChange={e => setReduceAmount(Math.max(1, Number(e.target.value) || 1))}
+                  disabled={deleting || deleteTarget.quantity === 0}
+                  className={cn(
+                    "flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold border-none outline-none",
+                    darkMode ? "bg-white/5 text-white border border-white/10" : "bg-white text-slate-900 border border-slate-200"
+                  )}
+                />
+                <button
+                  disabled={deleting || deleteTarget.quantity === 0 || reduceAmount < 1 || reduceAmount > deleteTarget.quantity}
+                  onClick={async () => {
+                    if (!deleteTarget) return;
+                    setDeleting(true);
+                    setDeleteError('');
+                    try {
+                      const next = Math.max(0, deleteTarget.quantity - reduceAmount);
+                      await updateDoc(doc(db, 'inventory', deleteTarget.id), { quantity: next });
+                      setDeleteTarget(null);
+                    } catch (err) {
+                      setDeleteError(handleFirestoreError(err, OperationType.UPDATE, `inventory/${deleteTarget.id}`));
+                    } finally {
+                      setDeleting(false);
+                    }
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Reduce
+                </button>
+              </div>
+              {deleteTarget.quantity === 0 && (
+                <p className="text-xs font-semibold text-orange-500">Stock is already zero — nothing to reduce.</p>
+              )}
+            </div>
+
+            <div className={cn(
+              "p-4 rounded-2xl border space-y-3",
+              darkMode ? "bg-red-500/5 border-red-500/20" : "bg-red-50 border-red-100"
+            )}>
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-xl shrink-0 bg-red-500/10 text-red-500">
+                  <Trash2 size={18} />
+                </div>
+                <div className="flex-1">
+                  <p className={cn("font-bold text-sm", darkMode ? "text-white" : "text-slate-900")}>Delete Entire Item</p>
+                  <p className={cn("text-xs font-medium mt-0.5", darkMode ? "text-slate-400" : "text-slate-600")}>
+                    Permanently removes the item and all associated purchase transactions.
+                  </p>
+                </div>
+              </div>
+              <button
+                disabled={deleting}
+                onClick={async () => {
+                  if (!deleteTarget) return;
+                  if (!confirm(`Permanently delete "${deleteTarget.name}" and all associated records? This cannot be undone.`)) return;
+                  setDeleting(true);
+                  setDeleteError('');
+                  try {
+                    const relatedSnap = await getDocs(query(collection(db, 'transactions'), where('inventoryItemId', '==', deleteTarget.id)));
+                    if (!relatedSnap.empty) {
+                      const batch = writeBatch(db);
+                      relatedSnap.docs.forEach(d => batch.delete(d.ref));
+                      await batch.commit();
+                    }
+                    await deleteDoc(doc(db, 'inventory', deleteTarget.id));
+                    setDeleteTarget(null);
+                  } catch (err) {
+                    setDeleteError(handleFirestoreError(err, OperationType.DELETE, `inventory/${deleteTarget.id}`));
+                  } finally {
+                    setDeleting(false);
+                  }
+                }}
+                className="w-full py-2.5 rounded-xl bg-red-600 text-white font-bold text-sm hover:bg-red-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {deleting ? 'Deleting…' : 'Delete Entire Item'}
+              </button>
+            </div>
+
+            {deleteError && (
+              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-sm font-medium flex items-center gap-2">
+                <AlertCircle size={16} />
+                <span>{deleteError}</span>
+              </div>
+            )}
+
+            <button
+              disabled={deleting}
+              onClick={() => { setDeleteTarget(null); setDeleteError(''); }}
+              className={cn(
+                "w-full py-3 rounded-xl font-bold border transition-all disabled:opacity-50",
+                darkMode ? "border-white/10 text-slate-300 hover:bg-white/5" : "border-slate-200 text-slate-600 hover:bg-slate-50"
+              )}
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       )}
     </div>
