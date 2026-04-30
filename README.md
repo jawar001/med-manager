@@ -72,21 +72,21 @@ Built on **React 19**, **TypeScript**, **Vite**, **Tailwind v4**, and **Firebase
 
 ```mermaid
 flowchart TD
-    A[User opens app] --> B{Signed in?}
-    B -- No --> C[Auth gate: Sign In / Sign Up]
-    C --> D[Firebase Auth validates credentials]
-    D --> E[Load profile, permissions, role]
+    A["User opens app"] --> B{"Signed in?"}
+    B -- No --> C["Auth gate — Sign In or Sign Up"]
+    C --> D["Firebase Auth validates credentials"]
+    D --> E["Load profile, permissions, role"]
     B -- Yes --> E
-    E --> F[Subscribe to Firestore collections via onSnapshot]
-    F --> G[Render Dashboard with live KPIs]
-    G --> H{Choose module}
-    H --> I[Patients · CRUD + medical history]
-    H --> J[Appointments · scheduling + status]
-    H --> K[Prescriptions · multi-medicine entries]
-    H --> L[Inventory · stock thresholds + restock]
-    H --> M[Analytics · charts + revenue mix]
-    H --> N[Sheets · export to PDF / JSON]
-    H --> O[Admin · users, roles, database tools]
+    E --> F["Subscribe to Firestore collections via onSnapshot"]
+    F --> G["Render Dashboard with live KPIs"]
+    G --> H{"Choose module"}
+    H --> I["Patients — CRUD and medical history"]
+    H --> J["Appointments — scheduling and status"]
+    H --> K["Prescriptions — multi-medicine entries"]
+    H --> L["Inventory — stock thresholds and restock"]
+    H --> M["Analytics — charts and revenue mix"]
+    H --> N["Sheets — export to PDF or JSON"]
+    H --> O["Admin — users, roles, database tools"]
 ```
 
 ---
@@ -213,19 +213,19 @@ The Admin tab gives the owner:
 
 ```mermaid
 graph LR
-    A[React 19 + TypeScript] --> B[App.tsx · single source of truth]
-    B --> C[Firebase Auth]
-    B --> D[Firestore onSnapshot subscriptions]
-    D --> E[(patients)]
-    D --> F[(appointments)]
-    D --> G[(prescriptions)]
-    D --> H[(inventory)]
-    D --> I[(transactions)]
-    D --> J[(doctors)]
-    B --> K[Tailwind 4 + Motion]
-    B --> L[Chart.js]
-    B --> M[jsPDF + autotable]
-    C --> N{firestore.rules}
+    A["React 19 + TypeScript"] --> B["App.tsx — single source of truth"]
+    B --> C["Firebase Auth"]
+    B --> D["Firestore onSnapshot subscriptions"]
+    D --> E[("patients")]
+    D --> F[("appointments")]
+    D --> G[("prescriptions")]
+    D --> H[("inventory")]
+    D --> I[("transactions")]
+    D --> J[("doctors")]
+    B --> K["Tailwind 4 + Motion"]
+    B --> L["Chart.js"]
+    B --> M["jsPDF + autotable"]
+    C --> N{"firestore.rules"}
     N --> D
 ```
 
